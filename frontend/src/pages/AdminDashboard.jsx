@@ -138,7 +138,7 @@ const AdminDashboard = () => {
         ['Total Revenue', analytics?.totalRevenue || 0]
       ];
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryData), 'Summary');
-      
+
       // Add service unit breakdown if products are available
       if (analytics?.topProducts) {
         const grouped = groupByServiceUnit(analytics.topProducts);
@@ -150,7 +150,7 @@ const AdminDashboard = () => {
         ];
         XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(unitData), 'Service Units');
       }
-      
+
       XLSX.writeFile(workbook, `kec-foodcourt-report-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (err) { alert('Export failed'); }
   };
@@ -264,7 +264,7 @@ const AdminDashboard = () => {
           <div className="admin-stat-icon icon-revenue"><FiDollarSign /></div>
           <div className="admin-stat-info">
             <h3>Daily Revenue</h3>
-            <p>{formatPrice(analytics.totalRevenue || 0)}</p>
+            <p>{formatPrice(analytics.totalRevenue || analytics.total_revenue || 0)}</p>
           </div>
         </div>
       </section>
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
               color: '#3b82f6',
               bgGradient: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
               trend: kitchenVTPI >= 70 ? 'up' : kitchenVTPI >= 50 ? 'stable' : 'down'
-            },{
+            }, {
               title: 'Snack Counter',
               score: snackVTPI,
               metrics: snackMetrics,
@@ -293,7 +293,7 @@ const AdminDashboard = () => {
               color: '#f59e0b',
               bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
               trend: snackVTPI >= 70 ? 'up' : snackVTPI >= 50 ? 'stable' : 'down'
-            },{
+            }, {
               title: 'Juice Counter',
               score: juiceVTPI,
               metrics: juiceMetrics,
@@ -305,11 +305,11 @@ const AdminDashboard = () => {
               const status = getVTPIStatus(unit.score);
               const trendIcon = unit.trend === 'up' ? '↑' : unit.trend === 'down' ? '↓' : '→';
               const trendColor = unit.trend === 'up' ? '#16a34a' : unit.trend === 'down' ? '#dc2626' : '#64748b';
-              
+
               return (
-                <div key={unit.title} style={{ 
+                <div key={unit.title} style={{
                   padding: '0',
-                  background: '#fff', 
+                  background: '#fff',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
                   overflow: 'hidden',
@@ -317,7 +317,7 @@ const AdminDashboard = () => {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                 }}>
                   {/* Header with gradient */}
-                  <div style={{ 
+                  <div style={{
                     background: unit.bgGradient,
                     padding: '1.25rem 1.5rem',
                     display: 'flex',
@@ -327,14 +327,14 @@ const AdminDashboard = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <span style={{ fontSize: '2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>{unit.icon}</span>
                       <div>
-                        <h3 style={{ 
-                          margin: 0, 
-                          fontSize: '1rem', 
-                          fontWeight: '600', 
+                        <h3 style={{
+                          margin: 0,
+                          fontSize: '1rem',
+                          fontWeight: '600',
                           color: '#fff',
                           textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                         }}>{unit.title}</h3>
-                        <div style={{ 
+                        <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.25rem',
@@ -352,17 +352,17 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ 
-                        fontSize: '2.25rem', 
-                        fontWeight: '800', 
+                      <div style={{
+                        fontSize: '2.25rem',
+                        fontWeight: '800',
                         color: '#fff',
                         lineHeight: '1',
                         textShadow: '0 2px 4px rgba(0,0,0,0.1)'
                       }}>
                         {unit.score}
                       </div>
-                      <div style={{ 
-                        fontSize: '0.75rem', 
+                      <div style={{
+                        fontSize: '0.75rem',
                         color: 'rgba(255,255,255,0.9)',
                         fontWeight: '600',
                         marginTop: '0.125rem'
@@ -374,14 +374,14 @@ const AdminDashboard = () => {
 
                   {/* Metrics body */}
                   <div style={{ padding: '1.5rem' }}>
-                    <div style={{ 
+                    <div style={{
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '1rem'
                     }}>
                       {/* ETA Metric */}
-                      <div style={{ 
-                        display: 'flex', 
+                      <div style={{
+                        display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.75rem',
@@ -390,7 +390,7 @@ const AdminDashboard = () => {
                         border: '1px solid #f1f5f9'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ 
+                          <div style={{
                             width: '32px',
                             height: '32px',
                             borderRadius: '6px',
@@ -402,16 +402,16 @@ const AdminDashboard = () => {
                           }}>⏱️</div>
                           <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Avg ETA</span>
                         </div>
-                        <strong style={{ 
-                          fontSize: '1rem', 
+                        <strong style={{
+                          fontSize: '1rem',
                           color: '#1e293b',
                           fontWeight: '700'
                         }}>{unit.metrics.avgEta} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>mins</span></strong>
                       </div>
 
                       {/* Stock Metric */}
-                      <div style={{ 
-                        display: 'flex', 
+                      <div style={{
+                        display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.75rem',
@@ -420,7 +420,7 @@ const AdminDashboard = () => {
                         border: '1px solid #f1f5f9'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ 
+                          <div style={{
                             width: '32px',
                             height: '32px',
                             borderRadius: '6px',
@@ -432,16 +432,16 @@ const AdminDashboard = () => {
                           }}>📦</div>
                           <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Avg Stock</span>
                         </div>
-                        <strong style={{ 
-                          fontSize: '1rem', 
+                        <strong style={{
+                          fontSize: '1rem',
                           color: '#1e293b',
                           fontWeight: '700'
                         }}>{unit.metrics.avgStock} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>units</span></strong>
                       </div>
 
                       {/* Rating Metric */}
-                      <div style={{ 
-                        display: 'flex', 
+                      <div style={{
+                        display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.75rem',
@@ -450,7 +450,7 @@ const AdminDashboard = () => {
                         border: '1px solid #f1f5f9'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ 
+                          <div style={{
                             width: '32px',
                             height: '32px',
                             borderRadius: '6px',
@@ -462,8 +462,8 @@ const AdminDashboard = () => {
                           }}>⭐</div>
                           <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Rating</span>
                         </div>
-                        <strong style={{ 
-                          fontSize: '1rem', 
+                        <strong style={{
+                          fontSize: '1rem',
                           color: '#1e293b',
                           fontWeight: '700'
                         }}>{unit.metrics.rating} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>/ 5.0</span></strong>
@@ -488,15 +488,15 @@ const AdminDashboard = () => {
         <div className="admin-card-body">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {demandForecast.slice(0, 6).map((item, idx) => {
-              const demandColor = 
+              const demandColor =
                 item.demand === 'High Demand' ? '#dc2626' :
-                item.demand === 'Moderate Demand' ? '#f59e0b' :
-                '#16a34a';
-              
+                  item.demand === 'Moderate Demand' ? '#f59e0b' :
+                    '#16a34a';
+
               const urgencyColor =
                 item.urgency === 'High' ? '#dc2626' :
-                item.urgency === 'Medium' ? '#f59e0b' :
-                '#16a34a';
+                  item.urgency === 'Medium' ? '#f59e0b' :
+                    '#16a34a';
 
               return (
                 <div
@@ -646,7 +646,7 @@ const AdminDashboard = () => {
                   data={{
                     labels: salesByMonth.map(item => item.month),
                     datasets: [{
-                      label: 'Daily Revenue (₹)',
+                      label: 'Daily Revenue',
                       data: salesByMonth.map(item => item.sales),
                       borderColor: '#0066cc',
                       backgroundColor: 'rgba(0, 102, 204, 0.05)',
@@ -656,7 +656,35 @@ const AdminDashboard = () => {
                       pointBorderWidth: 2
                     }]
                   }}
-                  options={{ responsive: true, maintainAspectRatio: false }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      tooltip: {
+                        callbacks: {
+                          label: function (context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                              label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                              label += formatPrice(context.parsed.y);
+                            }
+                            return label;
+                          }
+                        }
+                      }
+                    },
+                    scales: {
+                      y: {
+                        ticks: {
+                          callback: function (value) {
+                            return '₹' + value;
+                          }
+                        }
+                      }
+                    }
+                  }}
                 />
               ) : (
                 <Bar
@@ -756,7 +784,7 @@ const AdminDashboard = () => {
                   'Snack Counter': '#f59e0b',
                   'Juice Counter': '#10b981'
                 };
-                
+
                 return (
                   <div key={product.id} style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', paddingBottom: '1.25rem', borderBottom: idx === 4 ? 'none' : '1px solid #f1f5f9' }}>
                     <div style={{ width: '44px', height: '44px', borderRadius: '10px', overflow: 'hidden', background: '#f8fafc' }}>
@@ -771,10 +799,10 @@ const AdminDashboard = () => {
                       <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.9375rem', fontWeight: '600', color: '#1e293b' }}>{product.name}</h4>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <p style={{ margin: 0, fontSize: '0.8125rem', color: '#64748b' }}>{formatPrice(product.price)} • {product.totalSales} sold</p>
-                        <span style={{ 
-                          fontSize: '0.6875rem', 
-                          padding: '0.125rem 0.5rem', 
-                          borderRadius: '4px', 
+                        <span style={{
+                          fontSize: '0.6875rem',
+                          padding: '0.125rem 0.5rem',
+                          borderRadius: '4px',
                           background: `${unitColors[serviceUnit]}15`,
                           color: unitColors[serviceUnit],
                           fontWeight: '600'

@@ -1,0 +1,9 @@
+Starting seed...
+Connecting to MongoDB: mongodb://localhost:27017/kec_foodcourt
+✅ Connected to MongoDB
+✅ Synced product: Masala Dosa
+✅ Synced product: Idli Sambar (2 pcs)
+✅ Synced product: South Indian Thali
+✅ Synced product: Hyderabadi Chicken Biryani
+✅ Synced product: Paneer Dum Biryani
+🚀 Seeding completed. Total products in DB: 6

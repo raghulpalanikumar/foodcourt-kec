@@ -180,6 +180,7 @@ const ProductListing = () => {
                 <option value="lunch">Lunch</option>
                 <option value="snacks">Snacks</option>
                 <option value="juices">Juices</option>
+                <option value="biryani">Biryani</option>
                 <option value="north-indian">North Indian</option>
                 <option value="south-indian">South Indian</option>
                 <option value="beverages">Beverages</option>
@@ -336,12 +337,12 @@ const ProductListing = () => {
       ) : (
         <div className="grid grid-4">
           {products.map((product) => (
-  <ProductCard
-    key={product._id}
-    product={product}
-    allProducts={products}
-  />
-))}
+            <ProductCard
+              key={product._id}
+              product={product}
+              allProducts={products}
+            />
+          ))}
 
         </div>
       )}

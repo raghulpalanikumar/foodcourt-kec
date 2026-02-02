@@ -25,7 +25,10 @@ router.get('/', [
 
     // Build filter object
     const filter = {};
-    if (req.query.category) filter.category = req.query.category;
+    if (req.query.category && req.query.category !== 'all') {
+      filter.category = { $regex: new RegExp(`^${req.query.category}$`, 'i') };
+    }
+    console.log('🔍 Backend Filter:', JSON.stringify(filter));
     if (req.query.search) {
       filter.$or = [
         { name: { $regex: req.query.search, $options: 'i' } },
@@ -40,6 +43,8 @@ router.get('/', [
 
     const totalProducts = await Product.countDocuments(filter);
     const totalPages = Math.ceil(totalProducts / limit);
+
+    console.log(`✅ Found ${products.length} products out of ${totalProducts} total`);
 
     res.json({
       success: true,
@@ -87,7 +92,7 @@ router.post('/', protect, admin, [
   body('description').trim().notEmpty().withMessage('Food description is required'),
   body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
   body('image').notEmpty().withMessage('Food image URL is required'),
-  body('category').isIn(['breakfast', 'lunch', 'snacks', 'juices', 'north-indian', 'south-indian', 'beverages', 'desserts']).withMessage('Invalid food category'),
+  body('category').isIn(['breakfast', 'lunch', 'snacks', 'juices', 'biryani', 'north-indian', 'south-indian', 'beverages', 'desserts']).withMessage('Invalid food category'),
   body('stock').isInt({ min: 0 }).withMessage('Stock must be a non-negative integer'),
   body('isVeg').isBoolean().withMessage('isVeg must be a boolean')
 ], async (req, res) => {
@@ -126,7 +131,7 @@ router.put('/:id', protect, admin, [
   body('description').optional().trim().notEmpty().withMessage('Food description cannot be empty'),
   body('price').optional().isFloat({ min: 0 }).withMessage('Price must be a positive number'),
   body('image').optional().notEmpty().withMessage('Food image URL cannot be empty'),
-  body('category').optional().isIn(['breakfast', 'lunch', 'snacks', 'juices', 'north-indian', 'south-indian', 'beverages', 'desserts']).withMessage('Invalid food category'),
+  body('category').optional().isIn(['breakfast', 'lunch', 'snacks', 'juices', 'biryani', 'north-indian', 'south-indian', 'beverages', 'desserts']).withMessage('Invalid food category'),
   body('stock').optional().isInt({ min: 0 }).withMessage('Stock must be a non-negative integer'),
   body('isVeg').optional().isBoolean().withMessage('isVeg must be a boolean')
 ], async (req, res) => {

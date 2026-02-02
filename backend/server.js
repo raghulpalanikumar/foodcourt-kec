@@ -105,3 +105,5 @@ mongoose
     console.error('❌ MongoDB Connection Error:', err);
     process.exit(1);
   });
+
+// Trigger restart

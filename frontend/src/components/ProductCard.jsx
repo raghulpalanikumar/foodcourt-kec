@@ -17,7 +17,7 @@ import { useWishlist } from '../context/wishlistContext';
 import { useNotification } from '../context/notificationContext';
 import { useCompare } from '../context/compareContext';
 import { formatPrice } from '../utils/helpers';
-import Image from '../components/Image';
+import Image from './Image';
 import { constructImageUrl } from '../utils/imageUtils';
 import './ProductCard.css';
 
@@ -29,11 +29,7 @@ const getSmartETA = (stock) => {
   return 25 + Math.floor(Math.random() * 8);
 };
 
-const getQueueLabel = (eta) => {
-  if (eta <= 12) return { text: 'Low queue', color: '#16a34a', emoji: '🚀' };
-  if (eta <= 20) return { text: 'Moderate queue', color: '#f59e0b', emoji: '⏱️' };
-  return { text: 'Busy now', color: '#dc2626', emoji: '🔥' };
-};
+
 /* ------------------------------------------------ */
 
 /* -------- ZERO-WASTE SMART PRICING LOGIC -------- */
@@ -80,35 +76,7 @@ const getStudentRecommendations = ({ product, eta, finalPrice }) => {
 };
 /* ----------------------------------------------- */
 
-/* -------- SECOND-CHOICE LOGIC (SMART REDIRECTION) ------ */
-const getSecondChoice = ({ currentProduct, allProducts }) => {
-  if (currentProduct.queueLabel !== 'Busy now') return null;
 
-  const alternatives = allProducts.filter(p =>
-    p._id !== currentProduct._id &&
-    p.category === currentProduct.category &&
-    (p.stock || 0) > 5
-  );
-
-  if (!alternatives.length) return null;
-
-  const ranked = alternatives
-    .map(p => ({
-      ...p,
-      eta: getSmartETA(p.stock || 0)
-    }))
-    .filter(p => p.eta <= 15)
-    .sort((a, b) => a.eta - b.eta);
-
-  if (!ranked.length) return null;
-
-  return {
-    name: ranked[0].name,
-    eta: ranked[0].eta,
-    message: 'High demand right now. Faster option available'
-  };
-};
-/* ----------------------------------------------- */
 
 const ProductCard = ({ product, allProducts = [], showActions = true }) => {
   const { addToCart, isInCart, getItemQuantityInCart } = useCart();
@@ -118,11 +86,9 @@ const ProductCard = ({ product, allProducts = [], showActions = true }) => {
 
   const [isHovered, setIsHovered] = useState(false);
   const [eta] = useState(() => getSmartETA(product.stock || 0));
-  const [queueLabel] = useState(() => getQueueLabel(eta));
   const [finalPrice, setFinalPrice] = useState(product.price);
   const [offerTag, setOfferTag] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
-  const [flowSuggestion, setFlowSuggestion] = useState(null);
 
   useEffect(() => {
     const smartPrice = getSmartPrice(product.price, product.stock || 0);
@@ -136,18 +102,8 @@ const ProductCard = ({ product, allProducts = [], showActions = true }) => {
     });
     setRecommendations(recs);
 
-    if (!queueLabel) return;
-
-    const suggestion = getSecondChoice({
-      currentProduct: {
-        ...product,
-        queueLabel: queueLabel.text
-      },
-      allProducts
-    });
-
-    setFlowSuggestion(suggestion);
-  }, [product._id, eta, queueLabel]);
+    setRecommendations(recs);
+  }, [product._id, eta]);
 
   const isWishlisted = isInWishlist(product._id);
   const inCart = isInCart(product._id);
@@ -192,12 +148,12 @@ const ProductCard = ({ product, allProducts = [], showActions = true }) => {
     }
   };
 
-  const discountPercent = finalPrice < product.price 
+  const discountPercent = finalPrice < product.price
     ? Math.round(((product.price - finalPrice) / product.price) * 100)
     : 0;
 
   return (
-    <div 
+    <div
       className={`product-card-enhanced ${isHovered ? 'hovered' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -264,9 +220,9 @@ const ProductCard = ({ product, allProducts = [], showActions = true }) => {
         )}
 
         {/* Queue Status */}
-        {eta && queueLabel && (
-          <div className="queue-status" style={{ borderColor: queueLabel.color }}>
-            <span className="queue-emoji">{queueLabel.emoji}</span>
+        {eta && (
+          <div className="queue-status">
+            <span className="queue-emoji">⏱️</span>
             <span className="queue-time">{eta} mins</span>
           </div>
         )}
@@ -322,28 +278,7 @@ const ProductCard = ({ product, allProducts = [], showActions = true }) => {
           )}
         </div>
 
-        {/* Queue Label */}
-        {queueLabel && (
-          <div className="queue-label-inline">
-            <FiClock size={14} />
-            <span style={{ color: queueLabel.color, fontWeight: 600 }}>
-              {queueLabel.text}
-            </span>
-          </div>
-        )}
 
-        {/* Smart Redirection */}
-        {flowSuggestion && (
-          <div className="flow-suggestion">
-            <div className="suggestion-header">
-              <FiZap size={16} />
-              <strong>{flowSuggestion.message}</strong>
-            </div>
-            <div className="suggestion-body">
-              Try <strong>{flowSuggestion.name}</strong> — ready in {flowSuggestion.eta} mins
-            </div>
-          </div>
-        )}
 
         {/* Recommendations */}
         {recommendations.length > 0 && (
