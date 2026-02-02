@@ -63,7 +63,10 @@ router.get('/all', protect, async (req, res) => {
     }
 
     const orders = await Order.find(filter)
+<<<<<<<<< Temporary merge branch 1
+=========
 
+>>>>>>>>> Temporary merge branch 2
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -428,47 +431,81 @@ router.post('/', protect, [
       }
     }
 
-    // Create the order
-    const order = await Order.create({
+    console.log('Creating order in database...');
+
+<<<<<<<<< Temporary merge branch 1
+    const orderPayload = {
       user: req.user._id,
-      items: products.map(p => ({
+      items: orderProducts.map((p) => ({
         foodId: p.product,
         foodName: p.name,
         price: p.price,
         quantity: p.quantity
       })),
       totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
-      paymentMethod: req.body.paymentMethod || 'CASH',
-      paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
+      // Payment rules: allow CASH (COD) or ONLINE for all options
+      paymentMethod: (req.body.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH'),
+      paymentStatus: (req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending'),
       estimatedWait,
       alternateFood: alternateFood
         ? { name: alternateFood.name, id: alternateFood._id }
         : null,
-      deliveryType,
-      deliveryDetails: {
-        ...deliveryDetails,
-        ...(deliveryType === 'ReserveTable' && {
-          reservationSlot: req.body.reservationSlot || deliveryDetails.reservationSlot,
-          reservationTableNumber: Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber)
-        })
-      },
-      shippingAddress,
-      orderStatus: 'Preparing'
-    });
+      orderStatus: 'Preparing',
+      deliveryType: deliveryType === 'ReserveTable' ? 'ReserveTable' : deliveryType === 'Delivery' ? 'Delivery' : deliveryType === 'Pickup' ? 'Pickup' : deliveryType,
+      deliveryDetails: { ...deliveryDetails }
+    };
 
-    // If it's a table reservation, create the TableReservation record
-    if (deliveryType === 'ReserveTable') {
-      const slotStart = req.body.reservationSlot || deliveryDetails.reservationSlot;
-      const tableNumber = Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber);
+    if (deliveryType === 'ReserveTable' && (req.body.reservationSlot || deliveryDetails.reservationSlot)) {
+      orderPayload.deliveryDetails.reservationSlot = new Date(req.body.reservationSlot || deliveryDetails.reservationSlot);
+      orderPayload.deliveryDetails.reservationTableNumber = Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber);
+    }
 
-      await reservationController.createReservationForOrder(
+    const order = await Order.create(orderPayload);
+
+    // Create table reservation when deliveryType is ReserveTable
+    if (deliveryType === 'ReserveTable' && orderPayload.deliveryDetails.reservationSlot) {
+      const reservation = await reservationController.createReservationForOrder(
         req.user._id,
         order._id,
-        slotStart,
-        tableNumber
+        orderPayload.deliveryDetails.reservationSlot,
+        orderPayload.deliveryDetails.reservationTableNumber
       );
-      console.log(`✅ Table reservation created for Table ${tableNumber} at ${slotStart}`);
+      if (reservation) {
+        order.deliveryDetails = order.deliveryDetails || {};
+        order.deliveryDetails.reservationTableNumber = reservation.tableNumber;
+        await order.save();
+      }
     }
+
+    console.log('Order created, ID:', order._id);
+=========
+    // 🔥 CRITICAL FIX: Include totalAmount and paymentMethod in order creation
+    const order = await Order.create({
+      user: req.user._id,
+      products: orderProducts,
+
+      // 🔥 REQUIRED: totalAmount from frontend (or calculated total as fallback)
+      totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
+      total: req.body.totalAmount ? Number(req.body.totalAmount) : total, // For backward compatibility
+
+      // 🔥 REQUIRED: paymentMethod from frontend
+      paymentMethod: req.body.paymentMethod || 'CASH',
+
+      // 🔥 REQUIRED: paymentStatus based on payment method
+      paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
+
+      // 🔥 ETA: Dynamic estimated wait time
+      estimatedWait, // Smart calculation based on quantity + peak hours
+
+      // 🍽️ ALTERNATE FOOD: Intelligent recommendation
+      alternateFood: alternateFood
+        ? { name: alternateFood.name, id: alternateFood._id }
+        : null,
+
+      shippingAddress,
+
+      status: 'pending' // Set default status
+    });
 
     console.log('Order created, ID:', order._id);
     console.log('Order totalAmount:', order.totalAmount);
@@ -476,6 +513,10 @@ router.post('/', protect, [
     console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
     console.log('Order alternateFood:', order.alternateFood);
     console.log('Populating order details...');
+
+    await order.populate('user', 'name email');
+    console.log('Order populated. User email:', order.user?.email);
+>>>>>>>>> Temporary merge branch 2
 
     await order.populate('user', 'name email');
 
