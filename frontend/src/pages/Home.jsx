@@ -32,14 +32,6 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [scrollY, setScrollY] = useState(0);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
-  const statsRef = useRef(null);
-  const [statsVisible, setStatsVisible] = useState(false);
-  const [stats, setStats] = useState({
-    orders: 0,
-    students: 0,
-    dishes: 0,
-    rating: 0
-  });
 
   useEffect(() => {
     const loadFeaturedProducts = async () => {
@@ -66,49 +58,6 @@ const Home = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Animated Stats Counter
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !statsVisible) {
-          setStatsVisible(true);
-          animateStats();
-        }
-      },
-      { threshold: 0.5 }
-    );
-
-    if (statsRef.current) {
-      observer.observe(statsRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [statsVisible]);
-
-  const animateStats = () => {
-    const targetStats = { orders: 50000, students: 8000, dishes: 150, rating: 4.8 };
-    const duration = 2000;
-    const steps = 60;
-    const stepTime = duration / steps;
-
-    let currentStep = 0;
-    const interval = setInterval(() => {
-      currentStep++;
-      const progress = currentStep / steps;
-      
-      setStats({
-        orders: Math.floor(targetStats.orders * progress),
-        students: Math.floor(targetStats.students * progress),
-        dishes: Math.floor(targetStats.dishes * progress),
-        rating: (targetStats.rating * progress).toFixed(1)
-      });
-
-      if (currentStep >= steps) {
-        clearInterval(interval);
-        setStats(targetStats);
-      }
-    }, stepTime);
-  };
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -130,7 +79,7 @@ const Home = () => {
     {
       name: 'Executive Lunch',
       description: 'Full meals & varieties',
-      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+      image: 'https://static.vecteezy.com/system/resources/previews/040/703/949/non_2x/ai-generated-royal-feast-master-the-art-of-chicken-biryani-at-home-generative-ai-photo.jpg',
       link: '/products?category=lunch',
       icon: '🍛',
       color: 'from-green-400 to-emerald-500'
@@ -138,7 +87,7 @@ const Home = () => {
     {
       name: 'Snacks & Chats',
       description: 'Quick bites & evening treats',
-      image: 'https://images.unsplash.com/photo-1626132644529-56e96e313b0a?auto=format&fit=crop&w=600&q=80',
+      image: 'https://img.freepik.com/premium-photo/high-view-snacks-white-background-4k-hd-photo-product-design_1193781-35885.jpg?w=2000',
       link: '/products?category=snacks',
       icon: '🍟',
       color: 'from-yellow-400 to-orange-500'
@@ -150,6 +99,22 @@ const Home = () => {
       link: '/products?category=juices',
       icon: '🥤',
       color: 'from-blue-400 to-cyan-500'
+    },
+    {
+      name: 'Biryani Corner',
+      description: 'Aromatic & flavorful biryanis',
+      image: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=800&q=80',
+      link: '/products?category=biryani',
+      icon: '🥘',
+      color: 'from-red-500 to-orange-600'
+    },
+    {
+      name: 'Dessert Hub',
+      description: 'Sweet endings & delicacies',
+      image: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80',
+      link: '/products?category=desserts',
+      icon: '🍨',
+      color: 'from-pink-400 to-red-500'
     }
   ];
 
@@ -378,15 +343,15 @@ const Home = () => {
           transform: scale(1.2) rotate(5deg);
         }
 
-        /* Stats Section */
-        .stats-container {
+        /* Order Process Section */
+        .process-container {
           background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
-          padding: 5rem 0;
+          padding: 6rem 0;
           position: relative;
           overflow: hidden;
         }
 
-        .stats-container::before {
+        .process-container::before {
           content: '';
           position: absolute;
           top: -50%;
@@ -403,24 +368,60 @@ const Home = () => {
           100% { transform: translate(50px, 50px); }
         }
 
-        .stat-card {
+        .process-card {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 24px;
+          padding: 2.5rem;
           text-align: center;
           color: white;
+          transition: all 0.4s ease;
           position: relative;
           z-index: 1;
         }
 
-        .stat-number {
-          font-size: 3.5rem;
-          font-weight: 800;
-          margin-bottom: 0.5rem;
-          text-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        .process-card:hover {
+          background: rgba(255, 255, 255, 0.2);
+          transform: translateY(-10px);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
         }
 
-        .stat-label {
-          font-size: 1.1rem;
-          opacity: 0.95;
-          font-weight: 500;
+        .process-step {
+          position: absolute;
+          top: -20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #3b82f6;
+          color: white;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          font-size: 1.2rem;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+          border: 4px solid white;
+        }
+
+        .process-icon {
+          font-size: 3rem;
+          margin-bottom: 1.5rem;
+          display: block;
+        }
+
+        .process-title {
+          font-size: 1.5rem;
+          font-weight: 700;
+          margin-bottom: 1rem;
+        }
+
+        .process-desc {
+          font-size: 1rem;
+          opacity: 0.9;
+          line-height: 1.6;
         }
 
         /* Testimonial Card */
@@ -440,18 +441,34 @@ const Home = () => {
         }
 
         .testimonial-avatar {
-          width: 80px;
-          height: 80px;
+          width: 90px;
+          height: 90px;
           border-radius: 50%;
-          border: 4px solid #3b82f6;
-          margin: 0 auto 1.5rem;
-          box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+          border: 4px solid white;
+          margin: -75px auto 1.5rem;
+          box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2);
+          object-fit: cover;
+          position: relative;
+          z-index: 2;
         }
 
         .star-rating {
+          display: flex;
+          justify-content: center;
+          gap: 6px;
           color: #fbbf24;
-          font-size: 1.2rem;
-          margin: 1rem 0;
+          font-size: 1.25rem;
+          margin: 0.5rem 0 1.5rem;
+        }
+
+        .quote-icon {
+          font-size: 4rem;
+          color: rgba(59, 130, 246, 0.1);
+          position: absolute;
+          top: 2rem;
+          left: 2rem;
+          font-family: serif;
+          line-height: 1;
         }
 
         /* Time Slot Cards */
@@ -678,28 +695,28 @@ const Home = () => {
         <Carousel
           slides={[
             {
-              image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1600&auto=format&fit=crop',
-              badge: 'Fresh Daily',
-              title: 'Fueling the Engineers of Tomorrow',
-              subtitle: 'Delicious, hygienic, and affordable meals served fresh daily at Kongu Engineering College.',
-              primaryCta: { href: '/products', label: "View Today's Specials" },
-              secondaryCta: { href: '/products?category=lunch', label: 'Lunch Menu' },
+              image: 'https://wallpapers.com/images/hd/food-4k-1pf6px6ryqfjtnyr.jpg',
+              badge: 'KEC Premium Dining',
+              title: 'Exquisite Flavors, Campus Convenience',
+              subtitle: 'Elevating your college dining experience with premium cuisines and a vibrant, modern atmosphere.',
+              primaryCta: { href: '/products', label: "Explore Today's Menu" },
+              secondaryCta: { href: '/products?category=lunch', label: 'Lunch Specials' },
             },
             {
-              image: 'https://images.unsplash.com/photo-1601050633647-81a35d37c331?q=80&w=1600&auto=format&fit=crop',
-              badge: 'Breakfast Special',
-              title: 'Start Your Day with Proper Nutrition',
-              subtitle: 'Try our freshly made Idlis, Sambhar, and piping hot Ghee Roast.',
-              primaryCta: { href: '/products?category=breakfast', label: 'See Breakfast Menu' },
-              secondaryCta: { href: '/products', label: 'Full Menu' },
+              image: 'https://wallpapers.com/images/hd/food-4k-3gsi5u6kjma5zkj0.jpg',
+              badge: 'Authentic Heritage',
+              title: 'Traditional South Indian Delicacies',
+              subtitle: 'Savor the golden-crisp Dosas and fluffy Idlis, crafted with traditional recipes and premium ingredients.',
+              primaryCta: { href: '/products?category=breakfast', label: 'Breakfast Menu' },
+              secondaryCta: { href: '/products', label: 'View Full Menu' },
             },
             {
-              image: 'https://images.unsplash.com/photo-1626777553735-4817833f3c38?q=80&w=1600&auto=format&fit=crop',
-              badge: 'Vibrant Atmosphere',
-              title: 'The Heart of Campus Life',
-              subtitle: 'Relax, refuel, and reconnect with your friends at the KEC Food Court.',
+              image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1600&auto=format&fit=crop',
+              badge: 'Community & Vibes',
+              title: 'The Social Hub of Campus Life',
+              subtitle: 'Take a break from the labs and reconnect with friends over delicious treats and refreshing juices.',
               primaryCta: { href: '/products', label: 'Order Now' },
-              secondaryCta: { href: '#newsletter', label: 'Daily Updates' },
+              secondaryCta: { href: '#newsletter', label: 'Get Daily Updates' },
             },
           ]}
         />
@@ -709,7 +726,7 @@ const Home = () => {
       <section style={{ padding: '6rem 0', position: 'relative', overflow: 'hidden', background: '#f8fafc' }}>
         <div className="decorative-circle" style={{ width: '400px', height: '400px', top: '-200px', right: '-200px' }}></div>
         <div className="decorative-circle" style={{ width: '300px', height: '300px', bottom: '-150px', left: '-150px' }}></div>
-        
+
         <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem', position: 'relative', zIndex: 1 }}>
           <div className="section-header-enhanced fade-in-up">
             <h2>Why Choose KEC Food Court?</h2>
@@ -753,40 +770,46 @@ const Home = () => {
               </p>
             </div>
 
-            <div className="enhanced-feature-card fade-in-up stagger-4">
-              <div className="icon-container">
-                🕒
-              </div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '0.75rem', color: '#1e293b' }}>
-                Convenient Timing
-              </h3>
-              <p style={{ color: '#64748b', lineHeight: '1.7' }}>
-                Open from 7:00 AM to 8:00 PM daily. We're here throughout your college hours!
-              </p>
-            </div>
+
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="stats-container" ref={statsRef}>
+      {/* Order Process Section */}
+      <section className="process-container">
         <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem', position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '3rem' }}>
-            <div className="stat-card">
-              <div className="stat-number">{stats.orders.toLocaleString()}+</div>
-              <div className="stat-label">Orders Served</div>
+          <div className="section-header-enhanced" style={{ marginBottom: '5rem' }}>
+            <h2 style={{ color: 'white', background: 'none', WebkitTextFillColor: 'white' }}>How It Works</h2>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Get your favorite meal in four simple steps</p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '3rem' }}>
+            <div className="process-card fade-in-up stagger-1">
+              <div className="process-step">1</div>
+              <span className="process-icon">🔍</span>
+              <h3 className="process-title">Browse Menu</h3>
+              <p className="process-desc">Explore varied cuisines from South Indian classics to quick chats and juices.</p>
             </div>
-            <div className="stat-card">
-              <div className="stat-number">{stats.students.toLocaleString()}+</div>
-              <div className="stat-label">Happy Students</div>
+
+            <div className="process-card fade-in-up stagger-2">
+              <div className="process-step">2</div>
+              <span className="process-icon">🛒</span>
+              <h3 className="process-title">Add to Cart</h3>
+              <p className="process-desc">Pick your favorites, customize toppings, and add them to your virtual tray.</p>
             </div>
-            <div className="stat-card">
-              <div className="stat-number">{stats.dishes}+</div>
-              <div className="stat-label">Menu Items</div>
+
+            <div className="process-card fade-in-up stagger-3">
+              <div className="process-step">3</div>
+              <span className="process-icon">💳</span>
+              <h3 className="process-title">Secure Pay</h3>
+              <p className="process-desc">Complete your transaction quickly with our safe and integrated payment gateway.</p>
             </div>
-            <div className="stat-card">
-              <div className="stat-number">{stats.rating}★</div>
-              <div className="stat-label">Average Rating</div>
+
+            <div className="process-card fade-in-up stagger-4">
+              <div className="process-step">4</div>
+              <span className="process-icon">🍱</span>
+              <h3 className="process-title">Quick Pickup</h3>
+              <p className="process-desc">Receive a notification when it's ready and collect your hot meal from the counter.</p>
             </div>
           </div>
         </div>
@@ -893,9 +916,10 @@ const Home = () => {
           </div>
 
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <div className="testimonial-card">
-              <img 
-                src={testimonials[activeTestimonial].image} 
+            <div className="testimonial-card" style={{ marginTop: '4rem', textAlign: 'center', position: 'relative' }}>
+              <div className="quote-icon">"</div>
+              <img
+                src={testimonials[activeTestimonial].image}
                 alt={testimonials[activeTestimonial].name}
                 className="testimonial-avatar"
               />
@@ -904,15 +928,17 @@ const Home = () => {
                   <FiStar key={i} style={{ fill: '#fbbf24', stroke: '#fbbf24' }} />
                 ))}
               </div>
-              <p style={{ fontSize: '1.2rem', color: '#475569', lineHeight: '1.8', marginBottom: '1.5rem', fontStyle: 'italic' }}>
+              <p style={{ fontSize: '1.25rem', color: '#334155', lineHeight: '1.8', marginBottom: '2rem', fontStyle: 'italic', fontWeight: '500' }}>
                 "{testimonials[activeTestimonial].text}"
               </p>
-              <h4 style={{ fontSize: '1.3rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.25rem' }}>
-                {testimonials[activeTestimonial].name}
-              </h4>
-              <p style={{ color: '#3b82f6', fontWeight: '600' }}>
-                {testimonials[activeTestimonial].role}
-              </p>
+              <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: '1.5rem' }}>
+                <h4 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.25rem' }}>
+                  {testimonials[activeTestimonial].name}
+                </h4>
+                <p style={{ color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '0.9rem' }}>
+                  {testimonials[activeTestimonial].role}
+                </p>
+              </div>
             </div>
 
             {/* Testimonial Dots */}
@@ -941,7 +967,7 @@ const Home = () => {
       <section className="newsletter-section">
         <div className="newsletter-bg-shape" style={{ width: '400px', height: '400px', top: '-200px', right: '-200px' }}></div>
         <div className="newsletter-bg-shape" style={{ width: '300px', height: '300px', bottom: '-150px', left: '-150px' }}></div>
-        
+
         <div className="container" style={{ maxWidth: '900px', margin: '0 auto', padding: '0 2rem', textAlign: 'center', position: 'relative', zIndex: 1 }}>
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>📧</div>
           <h2 style={{ fontSize: '2.5rem', fontWeight: '800', marginBottom: '1rem', color: 'white' }}>
@@ -950,7 +976,7 @@ const Home = () => {
           <p style={{ fontSize: '1.2rem', opacity: 0.95, marginBottom: '2rem', color: 'white' }}>
             Subscribe to get daily updates on the menu and special festive delicacies.
           </p>
-          
+
           <form className="newsletter-form" onSubmit={(e) => e.preventDefault()}>
             <input
               type="email"

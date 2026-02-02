@@ -66,7 +66,7 @@ const OrderManagement = () => {
     ready: orders.filter(o => o.orderStatus === 'Ready').length,
     outForDelivery: orders.filter(o => o.orderStatus === 'OutForDelivery').length,
     completed: orders.filter(o => o.orderStatus === 'Delivered').length,
-    totalRevenue: orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0)
+    totalRevenue: orders.reduce((sum, order) => sum + (order.totalAmount || order.total || 0), 0)
   };
 
   if (loading && !refreshing) return <div style={{ padding: '4rem', textAlign: 'center' }}><div className="spinner"></div></div>;
@@ -147,7 +147,7 @@ const OrderManagement = () => {
                         {order.deliveryType}
                       </span>
                     </td>
-                    <td style={{ fontWeight: '600' }}>{formatPrice(order.totalAmount || 0)}</td>
+                    <td style={{ fontWeight: '600' }}>{formatPrice(order.totalAmount || order.total || 0)}</td>
                     <td>
                       <span className={`admin-badge badge-${(order.orderStatus || 'Preparing').toLowerCase()}`}>
                         {order.orderStatus}
@@ -259,7 +259,7 @@ const OrderManagement = () => {
               }}>
                 <span style={{ fontSize: '1.2rem', fontWeight: '600' }}>Bill Amount:</span>
                 <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0066cc' }}>
-                  {formatPrice(selectedOrder.totalAmount || 0)}
+                  {formatPrice(selectedOrder.totalAmount || selectedOrder.total || 0)}
                 </span>
               </div>
             </div>

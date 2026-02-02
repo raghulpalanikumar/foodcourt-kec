@@ -24,7 +24,7 @@ const productSchema = new mongoose.Schema({
   category: {
     type: String,
     required: [true, 'Category is required'],
-    enum: ['breakfast', 'lunch', 'snacks', 'juices', 'north-indian', 'south-indian', 'beverages', 'desserts']
+    enum: ['breakfast', 'lunch', 'snacks', 'juices', 'biryani', 'north-indian', 'south-indian', 'beverages', 'desserts']
   },
   isVeg: {
     type: Boolean,

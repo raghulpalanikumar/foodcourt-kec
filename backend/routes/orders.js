@@ -11,7 +11,7 @@ const router = express.Router();
 router.get('/', protect, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
-      
+
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -26,14 +26,12 @@ router.get('/', protect, async (req, res) => {
       user: { name: order.user?.name || req.user.name, email: order.user?.email || req.user.email },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: rawItems(order),
-      products: toProducts(rawItems(order)),
-      total: order.totalAmount ?? order.total,
-      status: order.orderStatus ?? order.status ?? 'pending',
-      deliveryType: order.deliveryType,
-      deliveryDetails: order.deliveryDetails,
-      estimatedWait: order.estimatedWait,
-      alternateFood: order.alternateFood,
+      items: order.products, // Map products to items
+      products: order.products, // Keep both for compatibility
+      total: order.total,
+      status: order.status || 'pending',
+      estimatedWait: order.estimatedWait, // ETA
+      alternateFood: order.alternateFood, // Recommended alternative
       shippingAddress: order.shippingAddress
     }));
 
@@ -65,6 +63,7 @@ router.get('/all', protect, async (req, res) => {
     }
 
     const orders = await Order.find(filter)
+      
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -79,14 +78,12 @@ router.get('/all', protect, async (req, res) => {
       user: { name: order.user?.name || 'Unknown User', email: order.user?.email || 'No email' },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: rawItems(order),
-      products: toProducts(rawItems(order)),
-      total: order.totalAmount ?? order.total,
-      status: order.orderStatus ?? order.status ?? 'pending',
-      deliveryType: order.deliveryType,
-      deliveryDetails: order.deliveryDetails,
-      estimatedWait: order.estimatedWait,
-      alternateFood: order.alternateFood,
+      items: order.products,
+      products: order.products,
+      total: order.total,
+      status: order.status || 'pending',
+      estimatedWait: order.estimatedWait, // ETA
+      alternateFood: order.alternateFood, // Recommended alternative
       shippingAddress: order.shippingAddress
     }));
 
@@ -192,7 +189,7 @@ router.put('/:id/status', protect, [
 router.get('/:id', protect, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      
+
       .populate('user', 'name email');
 
     if (!order) {
@@ -223,14 +220,12 @@ router.get('/:id', protect, async (req, res) => {
       user: { name: order.user?.name || 'Unknown User', email: order.user?.email || 'No email' },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: rawItems(order),
-      products: toProducts(rawItems(order)),
-      total: order.totalAmount ?? order.total,
-      status: order.orderStatus ?? order.status ?? 'pending',
-      deliveryType: order.deliveryType,
-      deliveryDetails: order.deliveryDetails,
-      estimatedWait: order.estimatedWait,
-      alternateFood: order.alternateFood,
+      items: order.products,
+      products: order.products,
+      total: order.total,
+      status: order.status || 'pending',
+      estimatedWait: order.estimatedWait, // ETA
+      alternateFood: order.alternateFood, // Recommended alternative
       shippingAddress: order.shippingAddress
     };
 
@@ -406,7 +401,7 @@ router.post('/', protect, [
       estimatedWait += 5; // Add 5 mins during lunch rush
     }
 
-    console.log(`📊 ETA Calculation: Base=15 + Quantity(${totalQuantity}x3)=${totalQuantity*3} + PeakHour=${hour >= 12 && hour <= 14 ? 5 : 0} = ${estimatedWait} mins`);
+    console.log(`📊 ETA Calculation: Base=15 + Quantity(${totalQuantity}x3)=${totalQuantity * 3} + PeakHour=${hour >= 12 && hour <= 14 ? 5 : 0} = ${estimatedWait} mins`);
 
     // ===== 🍽️ SMART ALTERNATE FOOD RECOMMENDATION =====
     let alternateFood = null;
@@ -416,7 +411,7 @@ router.post('/', protect, [
 
     if (firstProduct) {
       console.log(`🔍 Finding alternatives for: ${firstProduct.name} (Category: ${firstProduct.category})`);
-      
+
       // Find similar products (same category, different item, in stock)
       const alternatives = await Product.find({
         category: firstProduct.category,
@@ -434,52 +429,42 @@ router.post('/', protect, [
     }
 
     console.log('Creating order in database...');
-
-    const orderPayload = {
+    
+    // 🔥 CRITICAL FIX: Include totalAmount and paymentMethod in order creation
+    const order = await Order.create({
       user: req.user._id,
-      items: orderProducts.map((p) => ({
-        foodId: p.product,
-        foodName: p.name,
-        price: p.price,
-        quantity: p.quantity
-      })),
+      products: orderProducts,
+      
+      // 🔥 REQUIRED: totalAmount from frontend (or calculated total as fallback)
       totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
-      // Payment rules: allow CASH (COD) or ONLINE for all options
-      paymentMethod: (req.body.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH'),
-      paymentStatus: (req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending'),
-      estimatedWait,
+      total: req.body.totalAmount ? Number(req.body.totalAmount) : total, // For backward compatibility
+      
+      // 🔥 REQUIRED: paymentMethod from frontend
+      paymentMethod: req.body.paymentMethod || 'CASH',
+      
+      // 🔥 REQUIRED: paymentStatus based on payment method
+      paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
+      
+      // 🔥 ETA: Dynamic estimated wait time
+      estimatedWait, // Smart calculation based on quantity + peak hours
+      
+      // 🍽️ ALTERNATE FOOD: Intelligent recommendation
       alternateFood: alternateFood
         ? { name: alternateFood.name, id: alternateFood._id }
         : null,
-      orderStatus: 'Preparing',
-      deliveryType: deliveryType === 'ReserveTable' ? 'ReserveTable' : deliveryType === 'Delivery' ? 'Delivery' : deliveryType === 'Pickup' ? 'Pickup' : deliveryType,
-      deliveryDetails: { ...deliveryDetails }
-    };
-
-    if (deliveryType === 'ReserveTable' && (req.body.reservationSlot || deliveryDetails.reservationSlot)) {
-      orderPayload.deliveryDetails.reservationSlot = new Date(req.body.reservationSlot || deliveryDetails.reservationSlot);
-      orderPayload.deliveryDetails.reservationTableNumber = Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber);
-    }
-
-    const order = await Order.create(orderPayload);
-
-    // Create table reservation when deliveryType is ReserveTable
-    if (deliveryType === 'ReserveTable' && orderPayload.deliveryDetails.reservationSlot) {
-      const reservation = await reservationController.createReservationForOrder(
-        req.user._id,
-        order._id,
-        orderPayload.deliveryDetails.reservationSlot,
-        orderPayload.deliveryDetails.reservationTableNumber
-      );
-      if (reservation) {
-        order.deliveryDetails = order.deliveryDetails || {};
-        order.deliveryDetails.reservationTableNumber = reservation.tableNumber;
-        await order.save();
-      }
-    }
+      
+      shippingAddress,
+      
+      status: 'pending' // Set default status
+    });
 
     console.log('Order created, ID:', order._id);
-
+    console.log('Order totalAmount:', order.totalAmount);
+    console.log('Order paymentMethod:', order.paymentMethod);
+    console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
+    console.log('Order alternateFood:', order.alternateFood);
+    console.log('Populating order details...');
+    
     await order.populate('user', 'name email');
 
     const orderItems = order.items || [];

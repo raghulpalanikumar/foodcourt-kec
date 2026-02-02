@@ -156,7 +156,7 @@ const ProductManagement = () => {
     product.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const categories = ['breakfast', 'lunch', 'snacks', 'juices', 'north-indian', 'south-indian', 'beverages', 'desserts'];
+  const categories = ['breakfast', 'lunch', 'snacks', 'juices', 'biryani', 'north-indian', 'south-indian', 'beverages', 'desserts'];
 
   return (
     <div className="admin-products-page">

@@ -223,7 +223,7 @@ const UserDashboard = () => {
                           <tr key={o._id}>
                             <td style={{ fontWeight: 600 }}>#{o.tokenNumber || String(o._id).slice(-6).toUpperCase()}</td>
                             <td>{formatDate(o.createdAt)}</td>
-                            <td style={{ fontWeight: 700 }}>{formatPrice(o.totalAmount)}</td>
+                            <td style={{ fontWeight: 700 }}>{formatPrice(o.totalAmount || o.total || 0)}</td>
                             <td><span className={`dash-badge badge-${(o.orderStatus || 'Preparing').toLowerCase()}`}>{o.orderStatus || 'Preparing'}</span></td>
                           </tr>
                         ))}
@@ -263,7 +263,7 @@ const UserDashboard = () => {
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{(o.items || []).length} dish(es) total</div>
                       </td>
-                      <td style={{ fontWeight: 700 }}>{formatPrice(o.totalAmount)}</td>
+                      <td style={{ fontWeight: 700 }}>{formatPrice(o.totalAmount || o.total || 0)}</td>
                       <td><span className={`dash-badge badge-${(o.orderStatus || 'Preparing').toLowerCase()}`}>{o.orderStatus || 'Preparing'}</span></td>
                       <td><button className="dash-btn dash-btn-outline" style={{ padding: '6px' }} title="View Order Details"><FiEye /></button></td>
                     </tr>
