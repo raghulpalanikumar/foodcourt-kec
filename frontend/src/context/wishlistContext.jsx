@@ -45,7 +45,7 @@ const WishlistProvider = ({ children }) => {
         const parsedWishlist = JSON.parse(savedWishlist);
         dispatch({ type: 'SET_WISHLIST', payload: parsedWishlist });
       } catch (error) {
-        console.error('Error parsing wishlist from localStorage:', error);
+        
       }
     }
   }, []);

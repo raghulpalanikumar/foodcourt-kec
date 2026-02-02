@@ -27,7 +27,7 @@ const Cart = () => {
     if (newQuantity < 1) return;
     const productId = getProductId(item);
     if (!productId || productId === 'undefined') {
-      console.error('Invalid product ID:', productId, 'for item:', item);
+
       return;
     }
     updateQuantity(productId, newQuantity);
@@ -36,7 +36,7 @@ const Cart = () => {
   const handleRemoveItem = (item) => {
     const productId = getProductId(item);
     if (!productId || productId === 'undefined') {
-      console.error('Invalid product ID:', productId, 'for item:', item);
+
       return;
     }
     removeFromCart(productId);
@@ -474,7 +474,6 @@ const Cart = () => {
                 {cartItems.map((item, index) => {
                   const productId = getProductId(item);
                   if (!productId || productId === 'undefined') {
-                    console.warn('Skipping cart item with invalid ID:', item);
                     return null;
                   }
                   const itemKey = productId || `item-${index}`;
@@ -545,12 +544,12 @@ const Cart = () => {
                             color: '#2d3748',
                             transition: 'color 0.3s ease'
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#667eea';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#2d3748';
-                          }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#667eea';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#2d3748';
+                            }}
                           >
                             {item.name}
                           </h4>

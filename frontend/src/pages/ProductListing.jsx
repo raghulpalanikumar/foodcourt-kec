@@ -24,20 +24,18 @@ const ProductListing = () => {
     setLoading(true);
     setError(null); // Reset error state
     try {
-      console.log('Loading products with filters:', filters); // Debug log
       const data = await api.getProducts(filters);
-      console.log('Products received:', data); // Debug log
 
       // Ensure data is an array
       if (Array.isArray(data)) {
         setProducts(data);
       } else {
-        console.error('Expected array but received:', typeof data, data);
+        
         setProducts([]);
         setError('Invalid data format received from server');
       }
     } catch (error) {
-      console.error("Error loading products:", error);
+      
       setError(`Failed to load products: ${error.message}`);
       setProducts([]);
     } finally {

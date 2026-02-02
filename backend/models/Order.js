@@ -7,7 +7,7 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
 
-  // ✅ Order items
+  // ✅ Order items (Standard Field)
   items: [
     {
       foodId: {
@@ -28,6 +28,20 @@ const orderSchema = new mongoose.Schema({
         required: true,
         min: 1
       }
+    }
+  ],
+
+  // 🔄 Compatibility Field (Some controllers use 'products')
+  products: [
+    {
+      product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product'
+      },
+      name: String,
+      price: Number,
+      quantity: Number,
+      image: String
     }
   ],
 
@@ -58,6 +72,10 @@ const orderSchema = new mongoose.Schema({
     enum: ['Preparing', 'Ready', 'OutForDelivery', 'Delivered', 'Cancelled'],
     default: 'Preparing'
   },
+
+  // 🔄 Compatibility Fields
+  status: String,
+  total: Number,
 
   deliveryType: {
     type: String,

@@ -174,21 +174,11 @@ function App() {
   }
 
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <CartProvider>
-          <CompareProvider>
-            <WishlistProvider>
-              <Router>
-                <div className="App">
-                  <AppContent selectedRole={selectedRole} />
-                </div>
-              </Router>
-            </WishlistProvider>
-          </CompareProvider>
-        </CartProvider>
-      </NotificationProvider>
-    </AuthProvider>
+    <Router>
+      <div className="App">
+        <AppContent selectedRole={selectedRole} />
+      </div>
+    </Router>
   );
 }
 

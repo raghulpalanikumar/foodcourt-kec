@@ -332,23 +332,54 @@ router.get('/daily/:date', async (req, res) => {
     const dayEnd = new Date(selectedDate);
     dayEnd.setHours(23, 59, 59, 999);
 
-    // Aggregate dish-wise sales for the selected day
+    // Aggregate dish-wise sales for the selected day - Robust version handling both 'items' and 'products' fields
     const dishWiseSales = await Order.aggregate([
       {
         $match: {
           createdAt: { $gte: dayStart, $lt: dayEnd }
         }
       },
-      { $unwind: '$items' },
+      {
+        $project: {
+          // Normalize items to a single array for processing
+          allItems: {
+            $let: {
+              vars: {
+                safeItems: { $ifNull: ["$items", []] },
+                safeProducts: { $ifNull: ["$products", []] }
+              },
+              in: {
+                $cond: {
+                  if: { $gt: [{ $size: "$$safeItems" }, 0] },
+                  then: "$$safeItems",
+                  else: {
+                    $map: {
+                      input: "$$safeProducts",
+                      as: "p",
+                      in: {
+                        foodId: "$$p.product",
+                        foodName: "$$p.name",
+                        price: "$$p.price",
+                        quantity: "$$p.quantity"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      { $unwind: "$allItems" },
       {
         $group: {
           _id: {
-            foodId: '$items.foodId',
-            foodName: '$items.foodName'
+            foodId: "$allItems.foodId",
+            foodName: "$allItems.foodName"
           },
-          totalQuantity: { $sum: '$items.quantity' },
-          totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
-          price: { $first: '$items.price' },
+          totalQuantity: { $sum: "$allItems.quantity" },
+          totalRevenue: { $sum: { $multiply: ["$allItems.price", "$allItems.quantity"] } },
+          price: { $first: "$allItems.price" },
           orderCount: { $sum: 1 }
         }
       },
@@ -478,9 +509,20 @@ router.post('/generate-demo-data', async (req, res) => {
       demoOrders.push({
         user: user._id,
         items,
+        products: items.map(it => ({
+          product: it.foodId,
+          name: it.foodName,
+          price: it.price,
+          quantity: it.quantity,
+          image: it.image
+        })),
         totalAmount,
-        status: 'completed',
-        paymentStatus: 'paid',
+        total: totalAmount,
+        orderStatus: 'Delivered',
+        status: 'Delivered',
+        paymentStatus: 'Paid',
+        paymentMethod: 'CASH',
+        tokenNumber: `DEMO-${Math.floor(1000 + Math.random() * 9000)}-${i}`,
         createdAt: randomTime
       });
     }

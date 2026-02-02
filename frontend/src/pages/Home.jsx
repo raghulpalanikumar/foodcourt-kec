@@ -40,7 +40,7 @@ const Home = () => {
         const featured = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
         setFeaturedProducts(featured);
       } catch (error) {
-        console.error('Error loading featured products:', error);
+        
       } finally {
         setLoading(false);
       }

@@ -17,7 +17,7 @@ const RazorpayPayment = ({ amount, onSuccess, onError, buttonText = 'Pay Now' })
       });
       return data.order;
     } catch (error) {
-      console.error('Error creating order:', error);
+      
       throw error;
     }
   };
@@ -50,7 +50,7 @@ const RazorpayPayment = ({ amount, onSuccess, onError, buttonText = 'Pay Now' })
             
             onSuccess(response);
           } catch (error) {
-            console.error('Payment verification failed:', error);
+            
             onError('Payment verification failed');
           }
         },
@@ -71,7 +71,7 @@ const RazorpayPayment = ({ amount, onSuccess, onError, buttonText = 'Pay Now' })
       
       paymentObject.open();
     } catch (error) {
-      console.error('Payment error:', error);
+      
       onError('Error processing payment');
     } finally {
       setLoading(false);

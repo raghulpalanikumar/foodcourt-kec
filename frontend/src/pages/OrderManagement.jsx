@@ -33,7 +33,7 @@ const OrderManagement = () => {
 
       setOrders(filteredData);
     } catch (error) {
-      console.error('Error loading orders:', error);
+      
       setError(error.message || 'Failed to load orders.');
     } finally {
       setLoading(false);
@@ -78,7 +78,7 @@ const OrderManagement = () => {
         // Refresh data to ensure consistency
         await loadOrders(true);
       } catch (error) {
-        console.error('Error updating status:', error);
+        
         setError(error.message || 'Update failed.');
         // Revert the optimistic update on error
         await loadOrders(true);

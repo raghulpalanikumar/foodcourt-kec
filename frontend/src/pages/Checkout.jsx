@@ -28,8 +28,8 @@ const Checkout = () => {
   const checkoutItems = isBuyNow ? [buyNowItem] : cartItems;
 
   useEffect(() => {
-    console.log('Checkout component - Checkout items:', checkoutItems);
-    console.log('Checkout component - Mode:', isBuyNow ? 'Buy Now' : 'Cart Checkout');
+    
+    
   }, [checkoutItems, isBuyNow]);
 
   const [formData, setFormData] = useState({
@@ -104,7 +104,7 @@ const Checkout = () => {
         receipt: `order_rcpt_${Date.now()}`
       });
 
-      console.log('Razorpay Order Response:', orderResponse.data);
+      
 
       if (!orderResponse.data || !orderResponse.data.order) {
         throw new Error('Failed to create Razorpay order');
@@ -144,7 +144,7 @@ const Checkout = () => {
         alert(`Payment failed: ${response.error.description}`);
       });
     } catch (error) {
-      console.error('Error initializing Razorpay:', error);
+      
       setLoading(false);
       alert('Failed to initialize payment. Please try again.');
     }
@@ -154,10 +154,10 @@ const Checkout = () => {
     setLoading(true);
     try {
       // Log payment response for debugging
-      console.log('Payment response:', paymentResponse);
+      
 
       // Skip verification for now
-      console.log('Skipping payment verification for development');
+      
 
       const orderData = {
         items: checkoutItems.map((item) => ({
@@ -194,7 +194,7 @@ const Checkout = () => {
 
       // Create order
       const response = await api.post('/orders', orderData);
-      console.log('Order created:', response.data);
+      
 
       // 🔥 Capture ETA + alternate food from Razorpay order
       setOrderIntel({
@@ -214,7 +214,7 @@ const Checkout = () => {
       alert('Order placed successfully!');
       navigate('/orders');
     } catch (error) {
-      console.error('Order creation failed:', error);
+      
       setLoading(false);
       alert('Payment was successful but there was an issue creating your order. Please contact support with payment ID: ' +
         (paymentResponse.razorpay_payment_id || 'N/A'));
@@ -222,7 +222,7 @@ const Checkout = () => {
   };
 
   const handlePaymentError = (error) => {
-    console.error('Payment error:', error);
+    
     alert(`Payment error: ${error?.message || 'Something went wrong with the payment'}`);
   };
 
@@ -305,7 +305,7 @@ const Checkout = () => {
         setOrderPlaced(true);
       }
     } catch (error) {
-      console.error('❌ Order creation failed:', error);
+      
       alert('There was an issue creating your order. Please try again.');
     } finally {
       setLoading(false);

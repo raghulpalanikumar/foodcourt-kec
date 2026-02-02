@@ -115,18 +115,18 @@ router.get('/all', protect, async (req, res) => {
 // @access  Private
 // ==================
 router.put('/:id/status', protect, [
-  body('status').isIn(['pending', 'processing', 'shipped', 'delivered', 'cancelled']).withMessage('Invalid status')
+  body(['status', 'orderStatus']).optional()
 ], async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+    const status = req.body.status || req.body.orderStatus;
+
+    if (!status) {
       return res.status(400).json({
         success: false,
-        message: errors.array()[0].msg
+        message: 'Status is required'
       });
     }
 
-    const { status } = req.body;
     const order = await Order.findById(req.params.id).populate('user', 'name email');
 
     if (!order) {
@@ -136,10 +136,30 @@ router.put('/:id/status', protect, [
       });
     }
 
-    const currentStatus = order.orderStatus ?? order.status;
+    // Standardize status format to match model expectations
+    const normalizedStatus = status.toLowerCase();
+    let finalStatus = order.orderStatus;
+
+    // Map common status variations to model enums
+    if (['preparing', 'processing', 'pending'].includes(normalizedStatus)) {
+      finalStatus = 'Preparing';
+    } else if (['ready'].includes(normalizedStatus)) {
+      finalStatus = 'Ready';
+    } else if (['shipped', 'outfordelivery', 'out for delivery'].includes(normalizedStatus)) {
+      finalStatus = 'OutForDelivery';
+    } else if (['delivered', 'completed', 'success'].includes(normalizedStatus)) {
+      finalStatus = 'Delivered';
+    } else if (['cancelled', 'failed', 'refused'].includes(normalizedStatus)) {
+      finalStatus = 'Cancelled';
+    } else {
+      // If we don't recognize it, try to make it Title Case
+      finalStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    }
+
+    const currentStatus = order.orderStatus || order.status;
 
     const itemsForStock = order.items || order.products || [];
-    if (status === 'cancelled' && currentStatus !== 'Cancelled' && currentStatus !== 'cancelled') {
+    if (finalStatus === 'Cancelled' && (currentStatus !== 'Cancelled' && currentStatus !== 'cancelled')) {
       try {
         for (const item of itemsForStock) {
           const productId = item.foodId ?? item.product;
@@ -155,8 +175,7 @@ router.put('/:id/status', protect, [
       }
     }
 
-    const statusMap = { cancelled: 'Cancelled', delivered: 'Delivered', shipped: 'OutForDelivery', processing: 'Preparing', pending: 'Preparing' };
-    order.orderStatus = statusMap[status] || order.orderStatus || status;
+    order.orderStatus = finalStatus;
     order.updatedAt = new Date();
     await order.save();
 
@@ -342,7 +361,7 @@ router.post('/', protect, [
           success: false,
           message: 'Shipping address (address, city, postal code, country) is required for delivery'
         });
-        }
+      }
     } else {
       shippingAddress = shippingAddress || {
         address: deliveryType === 'ReserveTable' ? 'Table Reservation' : 'Food Court Pickup',
@@ -440,17 +459,23 @@ router.post('/', protect, [
       }
     }
 
-    console.log('Creating order in database...');
 
     // 🔥 CRITICAL FIX: Include totalAmount and paymentMethod in order creation
     const order = await Order.create({
       user: req.user._id,
       products: orderProducts,
+      items: orderProducts.map(p => ({
+        foodId: p.product,
+        foodName: p.name,
+        price: p.price,
+        quantity: p.quantity
+      })),
 
       // 🔥 REQUIRED: totalAmount from frontend (or calculated total as fallback)
       totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
       total: req.body.totalAmount ? Number(req.body.totalAmount) : total, // For backward compatibility
-
+      status: 'Preparing',
+      orderStatus: 'Preparing',
       // 🔥 REQUIRED: paymentMethod from frontend
       paymentMethod: req.body.paymentMethod || 'CASH',
 
@@ -465,17 +490,8 @@ router.post('/', protect, [
         ? { name: alternateFood.name, id: alternateFood._id }
         : null,
 
-      shippingAddress,
-
-      status: 'pending' // Set default status
+      shippingAddress
     });
-
-    console.log('Order created, ID:', order._id);
-    console.log('Order totalAmount:', order.totalAmount);
-    console.log('Order paymentMethod:', order.paymentMethod);
-    console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
-    console.log('Order alternateFood:', order.alternateFood);
-    console.log('Populating order details...');
 
     await order.populate('user', 'name email');
 

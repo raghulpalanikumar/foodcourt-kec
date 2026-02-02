@@ -95,7 +95,7 @@ const Register = () => {
         setError(result.message || 'Registration failed. Please try again.');
       }
     } catch (err) {
-      console.error('Registration error:', err);
+      
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);

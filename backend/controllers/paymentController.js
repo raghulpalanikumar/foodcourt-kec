@@ -70,10 +70,18 @@ const verifyPayment = async (req, res) => {
     const order = new Order({
       user: req.user._id,
       products: orderData.products,
+      items: (orderData.products || []).map(p => ({
+        foodId: p.product,
+        foodName: p.name,
+        price: p.price,
+        quantity: p.quantity
+      })),
       shippingAddress: orderData.shippingAddress,
       total: orderData.total,
-      paymentMethod: 'online',
-      paymentStatus: 'paid',
+      totalAmount: orderData.total,
+      orderStatus: 'Preparing',
+      paymentMethod: 'ONLINE',
+      paymentStatus: 'Paid',
       paymentDetails: {
         paymentId,
         orderId,

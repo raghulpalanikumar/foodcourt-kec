@@ -40,7 +40,7 @@ const ProductManagement = () => {
       const data = await api.getProducts();
       setProducts(data);
     } catch (error) {
-      console.error('Error loading menu:', error);
+      
       showNotification('error', 'Failed to load menu items.');
     } finally {
       setLoading(false);
@@ -84,7 +84,7 @@ const ProductManagement = () => {
         isVeg: formData.isVeg
       };
 
-      console.log('🚀 Sending Dish Data to Backend:', dishData);
+      
 
       if (editingProduct) {
         await api.updateProduct(editingProduct._id || editingProduct.id, dishData);
@@ -97,7 +97,7 @@ const ProductManagement = () => {
       await loadProducts();
       resetForm();
     } catch (error) {
-      console.error('Error saving dish:', error);
+      
       const backendMessage = error.response?.data?.message;
       const validationErrors = error.response?.data?.errors;
 
@@ -139,7 +139,7 @@ const ProductManagement = () => {
         await loadProducts();
         showNotification('success', 'Item removed from menu.');
       } catch (error) {
-        console.error('Error deleting item:', error);
+        
         showNotification('error', 'Failed to delete.');
       }
     }

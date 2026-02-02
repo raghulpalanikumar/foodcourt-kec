@@ -18,7 +18,7 @@ export default function RazorpayButton({
     loadScript('https://checkout.razorpay.com/v1/checkout.js')
       .then(() => setScriptLoaded(true))
       .catch(err => {
-        console.error('Razorpay SDK failed to load', err);
+        
         onError('Failed to load payment gateway. Please try again later.');
       });
   }, []);
@@ -43,7 +43,7 @@ export default function RazorpayButton({
       
       return await response.json();
     } catch (error) {
-      console.error('Error creating order:', error);
+      
       throw error;
     }
   };
@@ -97,7 +97,7 @@ export default function RazorpayButton({
       
       paymentObject.open();
     } catch (error) {
-      console.error('Payment error:', error);
+      
       onError(error.message || 'Failed to process payment');
       setLoading(false);
     }

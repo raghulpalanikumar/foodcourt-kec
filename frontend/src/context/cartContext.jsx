@@ -40,7 +40,7 @@ export const CartProvider = ({ children }) => {
       const result = await response.json();
       return result;
     } catch (error) {
-      console.error('API call error:', error);
+      
       throw error;
     }
   };
@@ -56,7 +56,7 @@ export const CartProvider = ({ children }) => {
         setCartItems(result.cart.items || []);
       }
     } catch (error) {
-      console.error('Error loading cart from database:', error);
+      
       showNotification('Error loading cart', 'error');
     } finally {
       setIsLoading(false);
@@ -89,7 +89,7 @@ export const CartProvider = ({ children }) => {
         showNotification('Cart synced successfully!', 'success');
       }
     } catch (error) {
-      console.error('Error syncing cart:', error);
+      
       showNotification('Error syncing cart', 'error');
       // Fallback to loading from DB
       await loadCartFromDB();
@@ -113,7 +113,7 @@ export const CartProvider = ({ children }) => {
             setCartItems(parsedCart);
           }
         } catch (error) {
-          console.error('Error loading cart from localStorage:', error);
+          
           localStorage.removeItem('cart');
         }
       }
@@ -130,7 +130,7 @@ export const CartProvider = ({ children }) => {
       try {
         localStorage.setItem('cart', JSON.stringify(cartItems));
       } catch (error) {
-        console.error('Error saving cart to localStorage:', error);
+        
       }
     }
   }, [cartItems, user]);
@@ -175,7 +175,7 @@ export const CartProvider = ({ children }) => {
 
     // Validate productId
     if (!productId || productId === 'undefined') {
-      console.error('Invalid product ID for addToCart:', product);
+      
       showNotification('Error adding item to cart - invalid product', 'error');
       return;
     }
@@ -201,7 +201,7 @@ export const CartProvider = ({ children }) => {
           showNotification(`"${product.name}" has been added to your cart!`, 'success');
         }
       } catch (error) {
-        console.error('Error adding to cart:', error);
+        
         showNotification('Error adding item to cart', 'error');
       } finally {
         setIsLoading(false);
@@ -240,7 +240,7 @@ export const CartProvider = ({ children }) => {
   const removeFromCart = async (productId) => {
     // Validate productId
     if (!productId || productId === 'undefined') {
-      console.error('Invalid product ID for removeFromCart:', productId);
+      
       showNotification('Error removing item from cart - invalid product ID', 'error');
       return;
     }
@@ -258,7 +258,7 @@ export const CartProvider = ({ children }) => {
           showNotification('Item removed from cart', 'info');
         }
       } catch (error) {
-        console.error('Error removing from cart:', error);
+        
         showNotification('Error removing item from cart', 'error');
       } finally {
         setIsLoading(false);
@@ -280,7 +280,7 @@ export const CartProvider = ({ children }) => {
   const updateQuantity = async (productId, newQuantity) => {
     // Validate productId
     if (!productId || productId === 'undefined') {
-      console.error('Invalid product ID for updateQuantity:', productId);
+      
       showNotification('Error updating cart - invalid product ID', 'error');
       return;
     }
@@ -294,7 +294,7 @@ export const CartProvider = ({ children }) => {
       // User logged in - update in database
       setIsLoading(true);
       try {
-        console.log('Updating cart item:', productId, 'to quantity:', newQuantity);
+        
 
         const result = await apiCall(`/cart/update/${productId}`, {
           method: 'PUT',
@@ -314,7 +314,7 @@ export const CartProvider = ({ children }) => {
           }
         }
       } catch (error) {
-        console.error('Error updating cart:', error);
+        
         showNotification('Error updating cart', 'error');
       } finally {
         setIsLoading(false);
@@ -357,7 +357,7 @@ export const CartProvider = ({ children }) => {
           }
         }
       } catch (error) {
-        console.error('Error clearing cart:', error);
+        
         showNotification('Error clearing cart', 'error');
       } finally {
         setIsLoading(false);

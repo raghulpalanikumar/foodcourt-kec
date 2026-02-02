@@ -139,7 +139,7 @@ const AdminDashboard = () => {
 
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('AdminDashboard: Error loading analytics:', error);
+      
     } finally {
       setLoading(false);
     }
@@ -153,7 +153,7 @@ const AdminDashboard = () => {
       const analyticsData = response.data || response;
       setDailyAnalytics(analyticsData);
     } catch (error) {
-      console.error('Error loading daily analytics:', error);
+      
       setDailyAnalytics(null);
     } finally {
       setDailyLoading(false);

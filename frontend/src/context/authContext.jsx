@@ -13,7 +13,7 @@ export const useAuth = () => {
 // Helper function to check if token is expired
 const isTokenExpired = (token) => {
   if (!token) return true;
-  
+
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     return payload.exp * 1000 < Date.now();
@@ -33,40 +33,81 @@ export const AuthProvider = ({ children, initialRole }) => {
     setUser(null);
     setToken(null);
     setUserRole('user'); // Reset to default role
+
+    // Clear session storage (tab-specific)
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+
+    // Also clear localStorage just in case older data exists
     localStorage.removeItem('user');
     localStorage.removeItem('token');
-    localStorage.removeItem('userRole');
   };
 
   useEffect(() => {
-    // Load user and token from localStorage on app start
-    const savedUser = localStorage.getItem('user');
-    const savedToken = localStorage.getItem('token');
+    // Session is now tab-specific (sessionStorage)
+    // This achieves the "New tab = signed out" behavior
+    const savedUser = sessionStorage.getItem('user');
+    const savedToken = sessionStorage.getItem('token');
     const savedRole = localStorage.getItem('userRole');
 
     if (savedUser && savedToken) {
-      // Check if token is expired
       if (isTokenExpired(savedToken)) {
-        console.log('Token expired, clearing auth data');
         clearAuthData();
+        setLoading(false);
       } else {
         try {
           const userData = JSON.parse(savedUser);
           setUser(userData);
           setToken(savedToken);
-          // Set role from user data or saved role
           setUserRole(userData.role || savedRole || 'user');
+
+          // Verify with backend that the session is truly valid
+          const verifySession = async () => {
+            try {
+              const response = await fetch('http://localhost:5000/api/auth/me', {
+                headers: {
+                  'Authorization': `Bearer ${savedToken}`
+                }
+              });
+
+              if (!response.ok) {
+                clearAuthData();
+              } else {
+                const data = await response.json();
+                if (data.success) {
+                  setUser(data.data.user);
+                }
+              }
+            } catch (err) {
+              
+            } finally {
+              setLoading(false);
+            }
+          };
+          verifySession();
         } catch (error) {
-          console.error('Error parsing saved user data:', error);
+          
           clearAuthData();
+          setLoading(false);
         }
       }
-    } else if (savedRole) {
-      setUserRole(savedRole);
+    } else {
+      if (savedRole) setUserRole(savedRole);
+      setLoading(false);
     }
-
-    setLoading(false);
   }, []);
+
+  // Window Focus Listener - Refresh validity when returning to tab
+  useEffect(() => {
+    const handleFocus = () => {
+      if (token && isTokenExpired(token)) {
+        clearAuthData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [token]);
 
   const login = async (email, password) => {
     try {
@@ -82,21 +123,24 @@ export const AuthProvider = ({ children, initialRole }) => {
 
       if (response.ok && responseData.success) {
         const { user, token } = responseData.data;
-        
+
         setUser(user);
         setToken(token);
-        setUserRole(user.role); // Set the user role from the response
-        
-        localStorage.setItem('user', JSON.stringify(user));
-        localStorage.setItem('token', token);
-        localStorage.setItem('userRole', user.role); // Store user role
-        
+        setUserRole(user.role);
+
+        // ✅ Critical: Use sessionStorage for Tab Isolation
+        sessionStorage.setItem('user', JSON.stringify(user));
+        sessionStorage.setItem('token', token);
+
+        // Preference persists across tabs
+        localStorage.setItem('userRole', user.role);
+
         return { success: true, user };
       } else {
         return { success: false, message: responseData.message };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      
       return { success: false, message: 'Login failed. Please try again.' };
     }
   };
@@ -115,21 +159,21 @@ export const AuthProvider = ({ children, initialRole }) => {
 
       if (response.ok && responseData.success) {
         const { user, token } = responseData.data;
-        
+
         setUser(user);
         setToken(token);
-        setUserRole(user.role); // Set the user role from the response
-        
-        localStorage.setItem('user', JSON.stringify(user));
-        localStorage.setItem('token', token);
-        localStorage.setItem('userRole', user.role); // Store user role
-        
+        setUserRole(user.role);
+
+        sessionStorage.setItem('user', JSON.stringify(user));
+        sessionStorage.setItem('token', token);
+        localStorage.setItem('userRole', user.role);
+
         return { success: true, user };
       } else {
         return { success: false, message: responseData.message };
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      
       return { success: false, message: 'Registration failed. Please try again.' };
     }
   };
@@ -153,25 +197,20 @@ export const AuthProvider = ({ children, initialRole }) => {
 
       if (response.ok && responseData.success) {
         const updatedUser = responseData.data.user;
-
         setUser(updatedUser);
-
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
         return { success: true, user: updatedUser };
       } else {
         return { success: false, message: responseData.message };
       }
     } catch (error) {
-      console.error('Update profile error:', error);
+      
       return { success: false, message: 'Profile update failed. Please try again.' };
     }
   };
 
-  // Function to validate current session
   const validateSession = () => {
     if (token && isTokenExpired(token)) {
-      console.log('Session expired, logging out');
       logout();
       return false;
     }
@@ -192,9 +231,9 @@ export const AuthProvider = ({ children, initialRole }) => {
     setUser: (userData) => {
       setUser(userData);
       if (userData) {
-        localStorage.setItem('user', JSON.stringify(userData));
+        sessionStorage.setItem('user', JSON.stringify(userData));
       } else {
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('user');
       }
     },
   };

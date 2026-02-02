@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../utils/api';
+import api from '../utils/api';
 
 const CompareContext = createContext();
 
@@ -25,7 +25,7 @@ export const CompareProvider = ({ children }) => {
         setCompareItems(parsedItems);
       }
     } catch (error) {
-      console.error('Error loading compare items from localStorage:', error);
+      
       localStorage.removeItem('compareItems');
     }
   }, []);
@@ -35,7 +35,7 @@ export const CompareProvider = ({ children }) => {
     try {
       localStorage.setItem('compareItems', JSON.stringify(compareItems));
     } catch (error) {
-      console.error('Error saving compare items to localStorage:', error);
+      
     }
   }, [compareItems]);
 
@@ -131,15 +131,15 @@ export const CompareProvider = ({ children }) => {
         if (cachedProducts.length === productIds.length) {
           return cachedProducts;
         }
-        
+
         // Otherwise, fetch from backend
         return await api.getProductsByIds(productIds);
       }
-      
+
       // If no IDs provided, return current compare items
       return compareItems;
     } catch (error) {
-      console.error('Error getting comparison products:', error);
+      
       showNotification('Error loading comparison products', 'error');
       throw error;
     }

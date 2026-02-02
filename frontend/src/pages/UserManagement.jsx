@@ -63,7 +63,7 @@ const UserManagement = () => {
       
       setUsers(transformedUsers);
     } catch (error) {
-      console.error('Error loading users:', error);
+      
       setError(error.message);
       setUsers([]);
     } finally {
@@ -84,7 +84,7 @@ const UserManagement = () => {
       }
       alert('Updated.');
     } catch (error) {
-      console.error('Error:', error);
+      
       alert(`Failed: ${error.message}`);
     } finally {
       setUpdateLoading(false);

@@ -52,6 +52,14 @@ const Login = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Check for session expiration message
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('session') === 'expired') {
+      setError('Your session has expired. Please log in again.');
+    }
+  }, [location]);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -73,7 +81,7 @@ const Login = () => {
         setError(result.message || 'Login failed. Please check your credentials.');
       }
     } catch (err) {
-      console.error('Login error:', err);
+      
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -803,7 +811,7 @@ const Login = () => {
             </div>
           ))}
         </div>
-        
+
         <div className="hero-overlay"></div>
 
         {/* Content */}
@@ -817,7 +825,7 @@ const Login = () => {
           </div>
 
           <p className="hero-description">
-            Experience the finest dining at Kongu Engineering College. 
+            Experience the finest dining at Kongu Engineering College.
             Fresh, delicious, and nutritious meals crafted with care for our engineering community.
           </p>
 
