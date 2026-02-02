@@ -170,11 +170,17 @@ exports.updateOrderStatus = async (req, res) => {
         await sendOrderStatusUpdateEmail(
           user.email,
           user.name,
-          order.tokenNumber,
+          {
+            orderId: order._id.toString().slice(-8),
+            tokenNumber: order.tokenNumber,
+            total: order.totalAmount,
+            items: order.items
+          },
           orderStatus
         );
+        console.log(`Status update email sent to ${user.email} for order ${order.tokenNumber}`);
       } catch (err) {
-        console.error("Status email failed");
+        console.error("Status email failed:", err.message);
       }
     }
 

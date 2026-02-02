@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiEye, FiFilter, FiRefreshCw, FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiAlertCircle, FiDollarSign } from 'react-icons/fi';
+import { FiEye, FiFilter, FiRefreshCw, FiPackage, FiTruck, FiCheckCircle, FiXCircle, FiAlertCircle, FiDollarSign, FiShoppingCart } from 'react-icons/fi';
 import { api } from '../utils/api';
 import { formatPrice, formatDate, getStatusColor } from '../utils/helpers';
 import { constructImageUrl } from '../utils/imageUtils';
@@ -45,11 +45,43 @@ const OrderManagement = () => {
     if (window.confirm(`Update order status to "${newStatus}"?`)) {
       try {
         setError(null);
+        
+        // Optimistic UI update - immediately update the local state
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order._id === orderId 
+              ? { ...order, orderStatus: newStatus }
+              : order
+          )
+        );
+        
+        // Update stats optimistically
+        const updatedStats = { ...stats };
+        const orderToUpdate = orders.find(o => o._id === orderId);
+        if (orderToUpdate) {
+          // Decrease count of old status
+          const oldStatusKey = orderToUpdate.orderStatus.toLowerCase();
+          if (updatedStats.hasOwnProperty(oldStatusKey)) {
+            updatedStats[oldStatusKey]--;
+          }
+          
+          // Increase count of new status
+          const newStatusKey = newStatus.toLowerCase();
+          if (updatedStats.hasOwnProperty(newStatusKey)) {
+            updatedStats[newStatusKey]++;
+          }
+        }
+        
+        // Make API call
         await api.updateOrderStatus(orderId, { orderStatus: newStatus });
+        
+        // Refresh data to ensure consistency
         await loadOrders(true);
       } catch (error) {
         console.error('Error updating status:', error);
         setError(error.message || 'Update failed.');
+        // Revert the optimistic update on error
+        await loadOrders(true);
       }
     }
   };
@@ -61,12 +93,15 @@ const OrderManagement = () => {
 
   const handleRefresh = () => loadOrders(true);
 
+  // Calculate stats from current orders state
   const stats = {
     preparing: orders.filter(o => o.orderStatus === 'Preparing').length,
     ready: orders.filter(o => o.orderStatus === 'Ready').length,
     outForDelivery: orders.filter(o => o.orderStatus === 'OutForDelivery').length,
-    completed: orders.filter(o => o.orderStatus === 'Delivered').length,
-    totalRevenue: orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0)
+    delivered: orders.filter(o => o.orderStatus === 'Delivered').length,
+    cancelled: orders.filter(o => o.orderStatus === 'Cancelled').length,
+    totalRevenue: orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0),
+    totalOrders: orders.length
   };
 
   if (loading && !refreshing) return <div style={{ padding: '4rem', textAlign: 'center' }}><div className="spinner"></div></div>;
@@ -108,12 +143,24 @@ const OrderManagement = () => {
           <div className="admin-stat-info"><h3>Ready</h3><p>{stats.ready}</p></div>
         </div>
         <div className="admin-stat-card">
+          <div className="admin-stat-icon" style={{ background: '#f0f9ff', color: '#0ea5e9' }}><FiTruck /></div>
+          <div className="admin-stat-info"><h3>Out for Delivery</h3><p>{stats.outForDelivery}</p></div>
+        </div>
+        <div className="admin-stat-card">
           <div className="admin-stat-icon" style={{ background: '#f0fdf4', color: '#22c55e' }}><FiCheckCircle /></div>
-          <div className="admin-stat-info"><h3>Completed</h3><p>{stats.completed}</p></div>
+          <div className="admin-stat-info"><h3>Delivered</h3><p>{stats.delivered}</p></div>
+        </div>
+        <div className="admin-stat-card">
+          <div className="admin-stat-icon" style={{ background: '#fef2f2', color: '#ef4444' }}><FiXCircle /></div>
+          <div className="admin-stat-info"><h3>Cancelled</h3><p>{stats.cancelled}</p></div>
         </div>
         <div className="admin-stat-card">
           <div className="admin-stat-icon icon-revenue"><FiDollarSign /></div>
-          <div className="admin-stat-info"><h3>Revenue</h3><p>{formatPrice(stats.totalRevenue)}</p></div>
+          <div className="admin-stat-info"><h3>Total Revenue</h3><p>{formatPrice(stats.totalRevenue)}</p></div>
+        </div>
+        <div className="admin-stat-card">
+          <div className="admin-stat-icon" style={{ background: '#f5f3ff', color: '#7c3aed' }}><FiShoppingCart /></div>
+          <div className="admin-stat-info"><h3>Total Orders</h3><p>{stats.totalOrders}</p></div>
         </div>
       </section>
 

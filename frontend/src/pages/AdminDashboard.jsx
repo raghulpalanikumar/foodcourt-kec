@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPackage, FiUsers, FiShoppingCart, FiDollarSign, FiTrendingUp, FiDownload, FiRefreshCw, FiPieChart, FiClock, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { FiPackage, FiUsers, FiShoppingCart, FiDollarSign, FiTrendingUp, FiDownload, FiRefreshCw, FiPieChart, FiClock, FiAlertCircle, FiCheckCircle, FiTruck, FiAward, FiXCircle } from 'react-icons/fi';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -16,7 +16,7 @@ import {
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import * as XLSX from 'xlsx';
 import { api } from '../utils/api';
-import { formatPrice, formatDate, getStatusColor } from "../utils/helpers";
+import { formatPrice } from "../utils/helpers";
 import { constructImageUrl } from '../utils/imageUtils';
 import { getDemandScore, getDemandLabel, getPrepRecommendation } from '../utils/demandPrediction';
 import '../styles/admin.css';
@@ -102,24 +102,61 @@ const AdminDashboard = () => {
   const [chartType, setChartType] = useState('line');
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
+  // Daily dish-wise analytics state
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dailyAnalytics, setDailyAnalytics] = useState(null);
+  const [dailyLoading, setDailyLoading] = useState(false);
+  // Product-wise daily sales trend state
+  const [selectedProductForTrend, setSelectedProductForTrend] = useState(null);
+  // Unused state variable kept for future expansion of collapsed/expanded day details
+  // const [expandedDayDetails] = useState(null);
+
   useEffect(() => {
     loadAnalytics();
+    loadDailyAnalytics(selectedDate);
     const intervalId = setInterval(() => {
       loadAnalytics();
     }, 30000); // 30s refresh for live kitchen
     return () => clearInterval(intervalId);
-  }, []);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (selectedDate) {
+      loadDailyAnalytics(selectedDate);
+    }
+  }, [selectedDate]);
 
   const loadAnalytics = async () => {
     try {
       const data = await api.getAnalytics();
       const normalized = data && typeof data === 'object' && 'data' in data ? data.data : data;
       setAnalytics(normalized);
+
+      // Auto-select first product for trend if none selected
+      if (normalized?.productDailySales?.length > 0 && !selectedProductForTrend) {
+        setSelectedProductForTrend(normalized.productDailySales[0]);
+      }
+
       setLastUpdated(new Date());
     } catch (error) {
       console.error('AdminDashboard: Error loading analytics:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDailyAnalytics = async (date) => {
+    try {
+      setDailyLoading(true);
+      const response = await api.getDailyDishAnalytics(date);
+      // Handle both direct data and wrapped response
+      const analyticsData = response.data || response;
+      setDailyAnalytics(analyticsData);
+    } catch (error) {
+      console.error('Error loading daily analytics:', error);
+      setDailyAnalytics(null);
+    } finally {
+      setDailyLoading(false);
     }
   };
 
@@ -138,7 +175,7 @@ const AdminDashboard = () => {
         ['Total Revenue', analytics?.totalRevenue || 0]
       ];
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryData), 'Summary');
-      
+
       // Add service unit breakdown if products are available
       if (analytics?.topProducts) {
         const grouped = groupByServiceUnit(analytics.topProducts);
@@ -150,9 +187,9 @@ const AdminDashboard = () => {
         ];
         XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(unitData), 'Service Units');
       }
-      
+
       XLSX.writeFile(workbook, `kec-foodcourt-report-${new Date().toISOString().split('T')[0]}.xlsx`);
-    } catch (err) { alert('Export failed'); }
+    } catch { alert('Export failed'); }
   };
 
   if (loading) return (
@@ -285,7 +322,7 @@ const AdminDashboard = () => {
               color: '#3b82f6',
               bgGradient: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
               trend: kitchenVTPI >= 70 ? 'up' : kitchenVTPI >= 50 ? 'stable' : 'down'
-            },{
+            }, {
               title: 'Snack Counter',
               score: snackVTPI,
               metrics: snackMetrics,
@@ -293,7 +330,7 @@ const AdminDashboard = () => {
               color: '#f59e0b',
               bgGradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
               trend: snackVTPI >= 70 ? 'up' : snackVTPI >= 50 ? 'stable' : 'down'
-            },{
+            }, {
               title: 'Juice Counter',
               score: juiceVTPI,
               metrics: juiceMetrics,
@@ -304,12 +341,12 @@ const AdminDashboard = () => {
             }].map(unit => {
               const status = getVTPIStatus(unit.score);
               const trendIcon = unit.trend === 'up' ? '↑' : unit.trend === 'down' ? '↓' : '→';
-              const trendColor = unit.trend === 'up' ? '#16a34a' : unit.trend === 'down' ? '#dc2626' : '#64748b';
-              
+              const _trendColor = unit.trend === 'up' ? '#16a34a' : unit.trend === 'down' ? '#dc2626' : '#64748b';
+
               return (
-                <div key={unit.title} style={{ 
+                <div key={unit.title} style={{
                   padding: '0',
-                  background: '#fff', 
+                  background: '#fff',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
                   overflow: 'hidden',
@@ -317,7 +354,7 @@ const AdminDashboard = () => {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                 }}>
                   {/* Header with gradient */}
-                  <div style={{ 
+                  <div style={{
                     background: unit.bgGradient,
                     padding: '1.25rem 1.5rem',
                     display: 'flex',
@@ -327,14 +364,14 @@ const AdminDashboard = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <span style={{ fontSize: '2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>{unit.icon}</span>
                       <div>
-                        <h3 style={{ 
-                          margin: 0, 
-                          fontSize: '1rem', 
-                          fontWeight: '600', 
+                        <h3 style={{
+                          margin: 0,
+                          fontSize: '1rem',
+                          fontWeight: '600',
                           color: '#fff',
                           textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                         }}>{unit.title}</h3>
-                        <div style={{ 
+                        <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.25rem',
@@ -352,17 +389,17 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ 
-                        fontSize: '2.25rem', 
-                        fontWeight: '800', 
+                      <div style={{
+                        fontSize: '2.25rem',
+                        fontWeight: '800',
                         color: '#fff',
                         lineHeight: '1',
                         textShadow: '0 2px 4px rgba(0,0,0,0.1)'
                       }}>
                         {unit.score}
                       </div>
-                      <div style={{ 
-                        fontSize: '0.75rem', 
+                      <div style={{
+                        fontSize: '0.75rem',
                         color: 'rgba(255,255,255,0.9)',
                         fontWeight: '600',
                         marginTop: '0.125rem'
@@ -374,14 +411,14 @@ const AdminDashboard = () => {
 
                   {/* Metrics body */}
                   <div style={{ padding: '1.5rem' }}>
-                    <div style={{ 
+                    <div style={{
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '1rem'
                     }}>
                       {/* ETA Metric */}
-                      <div style={{ 
-                        display: 'flex', 
+                      <div style={{
+                        display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.75rem',
@@ -390,7 +427,7 @@ const AdminDashboard = () => {
                         border: '1px solid #f1f5f9'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ 
+                          <div style={{
                             width: '32px',
                             height: '32px',
                             borderRadius: '6px',
@@ -402,16 +439,16 @@ const AdminDashboard = () => {
                           }}>⏱️</div>
                           <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Avg ETA</span>
                         </div>
-                        <strong style={{ 
-                          fontSize: '1rem', 
+                        <strong style={{
+                          fontSize: '1rem',
                           color: '#1e293b',
                           fontWeight: '700'
                         }}>{unit.metrics.avgEta} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>mins</span></strong>
                       </div>
 
                       {/* Stock Metric */}
-                      <div style={{ 
-                        display: 'flex', 
+                      <div style={{
+                        display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.75rem',
@@ -420,7 +457,7 @@ const AdminDashboard = () => {
                         border: '1px solid #f1f5f9'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ 
+                          <div style={{
                             width: '32px',
                             height: '32px',
                             borderRadius: '6px',
@@ -432,16 +469,16 @@ const AdminDashboard = () => {
                           }}>📦</div>
                           <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Avg Stock</span>
                         </div>
-                        <strong style={{ 
-                          fontSize: '1rem', 
+                        <strong style={{
+                          fontSize: '1rem',
                           color: '#1e293b',
                           fontWeight: '700'
                         }}>{unit.metrics.avgStock} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>units</span></strong>
                       </div>
 
                       {/* Rating Metric */}
-                      <div style={{ 
-                        display: 'flex', 
+                      <div style={{
+                        display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.75rem',
@@ -450,7 +487,7 @@ const AdminDashboard = () => {
                         border: '1px solid #f1f5f9'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ 
+                          <div style={{
                             width: '32px',
                             height: '32px',
                             borderRadius: '6px',
@@ -462,8 +499,8 @@ const AdminDashboard = () => {
                           }}>⭐</div>
                           <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Rating</span>
                         </div>
-                        <strong style={{ 
-                          fontSize: '1rem', 
+                        <strong style={{
+                          fontSize: '1rem',
                           color: '#1e293b',
                           fontWeight: '700'
                         }}>{unit.metrics.rating} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>/ 5.0</span></strong>
@@ -488,15 +525,15 @@ const AdminDashboard = () => {
         <div className="admin-card-body">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {demandForecast.slice(0, 6).map((item, idx) => {
-              const demandColor = 
+              const demandColor =
                 item.demand === 'High Demand' ? '#dc2626' :
-                item.demand === 'Moderate Demand' ? '#f59e0b' :
-                '#16a34a';
-              
+                  item.demand === 'Moderate Demand' ? '#f59e0b' :
+                    '#16a34a';
+
               const urgencyColor =
                 item.urgency === 'High' ? '#dc2626' :
-                item.urgency === 'Medium' ? '#f59e0b' :
-                '#16a34a';
+                  item.urgency === 'Medium' ? '#f59e0b' :
+                    '#16a34a';
 
               return (
                 <div
@@ -623,6 +660,626 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* 📊 DAILY SALES ANALYTICS - Products Sold Per Day */}
+      {analytics.salesByDay && (
+        <section className="admin-card" style={{ marginBottom: '2.5rem' }}>
+          <div className="admin-card-header">
+            <h2>Daily Sales Analytics (Last 30 Days)</h2>
+            <span style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: '500' }}>
+              Product units sold per day • Peak: {analytics.peakDay ? `${analytics.peakDay.date} (${analytics.peakDay.totalProductsSold} units)` : 'N/A'}
+            </span>
+          </div>
+          <div className="admin-card-body">
+            <div style={{ height: '350px', marginBottom: '1.5rem' }}>
+              <Bar
+                data={{
+                  labels: analytics.salesByDay.map(item => {
+                    const date = new Date(item.date);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  }),
+                  datasets: [{
+                    label: 'Products Sold',
+                    data: analytics.salesByDay.map(item => item.totalProductsSold),
+                    backgroundColor: analytics.salesByDay.map(item =>
+                      analytics.peakDay && item.date === analytics.peakDay.date
+                        ? '#f43f5e' // Highlight peak in red
+                        : '#3b82f6'  // Regular bars in blue
+                    ),
+                    borderColor: analytics.salesByDay.map(item =>
+                      analytics.peakDay && item.date === analytics.peakDay.date
+                        ? '#be123c'
+                        : '#1e40af'
+                    ),
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                  }]
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                      callbacks: {
+                        label: function (context) {
+                          return `${context.parsed.y} units sold`;
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      title: { display: true, text: 'Units Sold' }
+                    },
+                    x: {
+                      title: { display: true, text: 'Date' }
+                    }
+                  }
+                }}
+              />
+            </div>
+
+            {/* Peak Day Highlight Card */}
+            {analytics.peakDay && (
+              <div style={{
+                padding: '1.5rem',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #f43f5e 0%, #f97316 100%)',
+                color: '#fff',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', marginBottom: '0.5rem' }}>🏆 Peak Sales Day</h3>
+                  <p style={{ margin: 0, fontSize: '0.9375rem', opacity: 0.95 }}>
+                    {new Date(analytics.peakDay.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: '800' }}>{analytics.peakDay.totalProductsSold}</div>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>units sold</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Daily Sales Analytics Dashboard */}
+      <section style={{
+        marginBottom: '2.5rem',
+        padding: '1.5rem',
+        borderRadius: '12px',
+        background: 'linear-gradient(135deg, #f3e8ff 0%, #fce7f3 100%)',
+        border: '2px solid #d8b4fe'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.5rem',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div>
+            <h2 style={{ margin: '0 0 0.5rem 0', color: '#6b21a8', fontSize: '1.5rem', fontWeight: '800' }}>
+              📊 Daily Sales Analytics Dashboard
+            </h2>
+            <p style={{ margin: 0, color: '#7c3aed', fontSize: '0.9375rem', fontWeight: '500' }}>
+              {dailyAnalytics ? dailyAnalytics.timestamp : 'Select a date to view analytics'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              onClick={async () => {
+                try {
+                  await api.post('/analytics/generate-demo-data', {});
+                  alert('✅ Demo data created! Refresh to see it.');
+                  loadDailyAnalytics(selectedDate);
+                } catch (err) {
+                  alert('❌ ' + err.message);
+                }
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                background: '#10b981',
+                color: '#fff',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              📊 Generate Demo Data
+            </button>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: '2px solid #d8b4fe',
+                background: '#fff',
+                color: '#6b21a8',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            />
+          </div>
+        </div>
+
+        {dailyLoading ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#6b21a8' }}>
+            <p>Loading daily analytics...</p>
+          </div>
+        ) : dailyAnalytics && dailyAnalytics.dishes && dailyAnalytics.dishes.length > 0 ? (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+              {/* Summary Cards */}
+              <div style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: '#fff',
+                border: '2px solid #d8b4fe'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#6b21a8', fontWeight: '600', marginBottom: '0.5rem' }}>Total Dishes Sold</div>
+                <div style={{ fontSize: '2rem', fontWeight: '800', color: '#7c3aed' }}>{dailyAnalytics.dayTotals.totalDishes}</div>
+              </div>
+              <div style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: '#fff',
+                border: '2px solid #d8b4fe'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#6b21a8', fontWeight: '600', marginBottom: '0.5rem' }}>Total Quantity</div>
+                <div style={{ fontSize: '2rem', fontWeight: '800', color: '#7c3aed' }}>{dailyAnalytics.dayTotals.totalQuantity} units</div>
+              </div>
+              <div style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: '#fff',
+                border: '2px solid #d8b4fe'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#6b21a8', fontWeight: '600', marginBottom: '0.5rem' }}>Daily Revenue</div>
+                <div style={{ fontSize: '2rem', fontWeight: '800', color: '#7c3aed' }}>₹{dailyAnalytics.dayTotals.totalRevenue.toFixed(2)}</div>
+              </div>
+              <div style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: '#fff',
+                border: '2px solid #d8b4fe'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#6b21a8', fontWeight: '600', marginBottom: '0.5rem' }}>Avg per Dish</div>
+                <div style={{ fontSize: '2rem', fontWeight: '800', color: '#7c3aed' }}>₹{dailyAnalytics.dayTotals.averageRevenuePerDish.toFixed(2)}</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{
+            textAlign: 'center',
+            padding: '3rem 2rem',
+            color: '#6b21a8'
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+            <p style={{ fontSize: '1.125rem', fontWeight: '600', margin: '0 0 0.5rem 0' }}>
+              No sales data available
+            </p>
+            <p style={{ fontSize: '0.9375rem', color: '#7c3aed', margin: 0 }}>
+              Try selecting a date with orders or click "Generate Demo Data"
+            </p>
+          </div>
+        )}
+
+        {dailyAnalytics && dailyAnalytics.dishes && dailyAnalytics.dishes.length > 0 && (
+          <div style={{
+            marginTop: '2rem',
+            padding: '1.5rem',
+            background: '#fff',
+            borderRadius: '8px',
+            border: '2px solid #d8b4fe'
+          }}>
+            <h3 style={{ margin: '0 0 1.5rem 0', color: '#6b21a8', fontSize: '1.125rem', fontWeight: '700' }}>
+              Dish-wise Sales Breakdown
+            </h3>
+            <div style={{ height: '400px' }}>
+              <Bar
+                data={{
+                  labels: dailyAnalytics.dishes.map(d => d.foodName),
+                  datasets: [
+                    {
+                      label: 'Revenue (₹)',
+                      data: dailyAnalytics.dishes.map(d => d.totalRevenue),
+                      backgroundColor: dailyAnalytics.dishes.map(d =>
+                        d.isPeak ? '#dc2626' : '#a78bfa'
+                      ),
+                      borderColor: dailyAnalytics.dishes.map(d =>
+                        d.isPeak ? '#991b1b' : '#7c3aed'
+                      ),
+                      borderWidth: 2,
+                      borderRadius: 6,
+                      hoverBackgroundColor: '#7c3aed'
+                    }
+                  ]
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  indexAxis: dailyAnalytics.dishes.length > 8 ? 'y' : 'x',
+                  plugins: {
+                    legend: {
+                      display: true,
+                      labels: {
+                        color: '#6b21a8',
+                        font: { weight: 'bold', size: 12 },
+                        padding: 15
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: '#6b21a8',
+                      titleColor: '#fff',
+                      bodyColor: '#fff',
+                      borderColor: '#d8b4fe',
+                      borderWidth: 2,
+                      padding: 12,
+                      displayColors: true,
+                      callbacks: {
+                        label: function (context) {
+                          return `Revenue: ₹${context.parsed.x || context.parsed.y}`;
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: { color: '#6b21a8', stepSize: undefined },
+                      grid: { color: '#e9d5ff' }
+                    },
+                    x: {
+                      ticks: { color: '#6b21a8' },
+                      grid: { color: '#e9d5ff' }
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Detailed Table */}
+        {dailyAnalytics.dishes && dailyAnalytics.dishes.length > 0 && (
+          <div style={{
+            marginTop: '2rem',
+            overflowX: 'auto'
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ background: '#e9d5ff', borderBottom: '3px solid #d8b4fe' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', color: '#6b21a8' }}>Rank</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', color: '#6b21a8' }}>Dish Name</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', color: '#6b21a8' }}>Quantity</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', color: '#6b21a8' }}>Unit Price</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700', color: '#6b21a8' }}>Total Revenue</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', color: '#6b21a8' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyAnalytics.dishes.map((dish, idx) => (
+                  <tr
+                    key={idx}
+                    style={{
+                      borderBottom: '1px solid #e9d5ff',
+                      background: dish.isPeak ? '#fce7f3' : (idx % 2 === 0 ? '#fff' : '#faf5ff'),
+                      fontWeight: dish.isPeak ? '700' : '500'
+                    }}
+                  >
+                    <td style={{ padding: '0.75rem', color: '#6b21a8' }}>{dish.rank}</td>
+                    <td style={{ padding: '0.75rem', color: '#6b21a8' }}>{dish.foodName}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center', color: '#7c3aed' }}>
+                      <span style={{ background: '#e9d5ff', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                        {dish.totalQuantity}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center', color: '#7c3aed' }}>₹{dish.price.toFixed(2)}</td>
+                    <td style={{
+                      padding: '0.75rem',
+                      textAlign: 'right',
+                      color: '#7c3aed',
+                      fontWeight: '700'
+                    }}>
+                      ₹{dish.totalRevenue.toFixed(2)}
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                      {dish.isPeak ? (
+                        <span style={{
+                          background: '#dc2626',
+                          color: '#fff',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '700'
+                        }}>
+                          🏆 PEAK
+                        </span>
+                      ) : (
+                        <span style={{
+                          background: '#d8b4fe',
+                          color: '#6b21a8',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}>
+                          Active
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Peak Dish Highlight */}
+        {dailyAnalytics.peakDish && (
+          <div style={{
+            marginTop: '2rem',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+            color: '#fff',
+            border: '3px solid #991b1b'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '2.5rem' }}>🏆</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>Peak Selling Dish</h3>
+                <p style={{ margin: '0.25rem 0 0 0', opacity: 0.9 }}>Highest Revenue Contributor</p>
+              </div>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '1rem'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: '0.5rem' }}>Dish Name</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{dailyAnalytics.peakDish.foodName}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: '0.5rem' }}>Total Revenue</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>₹{dailyAnalytics.peakDish.totalRevenue.toFixed(2)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: '0.5rem' }}>Quantity Sold</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{dailyAnalytics.peakDish.totalQuantity} units</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </section>
+
+      {/* 📈 PRODUCT SALES TREND EXPLORER */}
+      <section className="admin-card" style={{ marginBottom: '2.5rem', border: '2px solid #3b82f6' }}>
+        <div className="admin-card-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff'
+            }}>
+              <FiTrendingUp size={20} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#1e293b' }}>Product Sales Explorer</h2>
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: '#64748b', fontWeight: '500' }}>Individual dish performance tracking over the last 30 days</p>
+            </div>
+          </div>
+        </div>
+        <div className="admin-card-body" style={{ paddingTop: '1.5rem' }}>
+          {/* Selector and Basic Stats */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '2rem',
+            flexWrap: 'wrap',
+            gap: '1.5rem',
+            padding: '1.25rem',
+            background: '#f8fafc',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <label style={{ fontWeight: '700', color: '#475569', fontSize: '0.9375rem' }}>Analyze Dish:</label>
+              <select
+                value={selectedProductForTrend?.productId || ''}
+                onChange={(e) => {
+                  const prod = (analytics.productDailySales || []).find(p => p.productId === e.target.value);
+                  setSelectedProductForTrend(prod);
+                }}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  borderRadius: '10px',
+                  border: '2px solid #cbd5e1',
+                  background: '#fff',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  color: '#1e293b',
+                  minWidth: '250px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                <option value="" disabled>-- Select a Product --</option>
+                {(analytics.productDailySales || []).map(p => (
+                  <option key={p.productId} value={p.productId}>{p.productName}</option>
+                ))}
+              </select>
+            </div>
+
+            {selectedProductForTrend && (
+              <div style={{ display: 'flex', gap: '1.5rem' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>Total Units</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#3b82f6' }}>{selectedProductForTrend.totalQuantity}</div>
+                </div>
+                <div style={{ width: '1px', background: '#e2e8f0' }}></div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>Total Revenue</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#10b981' }}>₹{selectedProductForTrend.totalRevenue.toFixed(2)}</div>
+                </div>
+                <div style={{ width: '1px', background: '#e2e8f0' }}></div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>Avg Price</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#6366f1' }}>₹{selectedProductForTrend.price.toFixed(2)}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {selectedProductForTrend ? (
+            <div style={{ padding: '0.5rem' }}>
+              <div style={{ height: '400px', marginBottom: '1.5rem' }}>
+                <Line
+                  data={{
+                    labels: (analytics.salesByDay || []).map(day => {
+                      const date = new Date(day.date);
+                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }),
+                    datasets: [
+                      {
+                        label: 'Units Sold',
+                        data: (analytics.salesByDay || []).map(day => {
+                          return selectedProductForTrend.dailyBreakdown[day.date]?.quantity || 0;
+                        }),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#fff',
+                        pointBorderWidth: 2,
+                        tension: 0.35,
+                        fill: true,
+                        yAxisID: 'y',
+                      },
+                      {
+                        label: 'Revenue (₹)',
+                        data: (analytics.salesByDay || []).map(day => {
+                          return selectedProductForTrend.dailyBreakdown[day.date]?.revenue || 0;
+                        }),
+                        borderColor: '#10b981',
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        tension: 0.35,
+                        yAxisID: 'y1',
+                      }
+                    ]
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                      mode: 'index',
+                      intersect: false,
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        labels: {
+                          usePointStyle: true,
+                          padding: 20,
+                          font: { weight: 'bold' }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: '#1e293b',
+                        padding: 12,
+                        titleFont: { size: 14, weight: 'bold' },
+                        callbacks: {
+                          label: function (context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.datasetIndex === 1) label += '₹';
+                            label += context.parsed.y;
+                            return label;
+                          }
+                        }
+                      }
+                    },
+                    scales: {
+                      y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Units Sold', color: '#3b82f6', font: { weight: 'bold' } },
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' }
+                      },
+                      y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Revenue (₹)', color: '#10b981', font: { weight: 'bold' } },
+                        grid: { drawOnChartArea: false },
+                        beginAtZero: true
+                      },
+                      x: {
+                        grid: { display: false }
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div style={{
+                textAlign: 'center',
+                fontSize: '0.8125rem',
+                color: '#64748b',
+                fontStyle: 'italic',
+                background: '#f1f5f9',
+                padding: '0.5rem',
+                borderRadius: '6px'
+              }}>
+                Tip: Hover over the chart to see daily breakdown of quantity and revenue for "{selectedProductForTrend.productName}".
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '5rem 3rem', background: '#f8fafc', borderRadius: '16px', border: '3px dashed #e2e8f0' }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                background: '#f1f5f9',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                marginBottom: '1.5rem'
+              }}>
+                <FiPieChart size={40} />
+              </div>
+              <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.25rem' }}>No Dish Selected</h3>
+              <p style={{ color: '#64748b', maxWidth: '400px', margin: '0 auto' }}>Select a dish from the dropdown menu above to visualize its daily sales performance over the past month.</p>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Data Visualization Row */}
       <div className="grid grid-2" style={{ gap: '2rem', marginBottom: '2.5rem' }}>
         <div className="admin-card">
@@ -703,6 +1360,63 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* User Metrics Section */}
+      {analytics.userMetrics && (
+        <section className="admin-card" style={{ marginBottom: '2.5rem' }}>
+          <div className="admin-card-header">
+            <h2>User Engagement Metrics</h2>
+            <span style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: '500' }}>Campus Dining Analytics</span>
+          </div>
+          <div className="admin-card-body">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
+              <div className="admin-stat-card" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                <div className="admin-stat-icon" style={{ background: '#0ea5e9', color: 'white' }}><FiUsers /></div>
+                <div className="admin-stat-info">
+                  <h3 style={{ color: '#0c4a6e' }}>Total Users</h3>
+                  <p style={{ color: '#0c4a6e', fontWeight: '700' }}>{analytics.totalUsers || 0}</p>
+                </div>
+              </div>
+              <div className="admin-stat-card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <div className="admin-stat-icon" style={{ background: '#22c55e', color: 'white' }}><FiCheckCircle /></div>
+                <div className="admin-stat-info">
+                  <h3 style={{ color: '#14532d' }}>Users with Orders</h3>
+                  <p style={{ color: '#14532d', fontWeight: '700' }}>{analytics.userMetrics.usersWithOrders || 0}</p>
+                </div>
+              </div>
+              <div className="admin-stat-card" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                <div className="admin-stat-icon" style={{ background: '#f59e0b', color: 'white' }}><FiAlertCircle /></div>
+                <div className="admin-stat-info">
+                  <h3 style={{ color: '#713f12' }}>Inactive Users</h3>
+                  <p style={{ color: '#713f12', fontWeight: '700' }}>{analytics.userMetrics.usersWithoutOrders || 0}</p>
+                </div>
+              </div>
+              <div className="admin-stat-card" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                <div className="admin-stat-icon" style={{ background: '#3b82f6', color: 'white' }}><FiTrendingUp /></div>
+                <div className="admin-stat-info">
+                  <h3 style={{ color: '#172554' }}>Avg Orders/User</h3>
+                  <p style={{ color: '#172554', fontWeight: '700' }}>{analytics.userMetrics.averageOrdersPerUser || 0}</p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '1.5rem' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0f172a' }}>{analytics.userMetrics.adminCount || 0}</div>
+                <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>Admin Accounts</div>
+              </div>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0f172a' }}>{analytics.userMetrics.regularUserCount || 0}</div>
+                <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>Regular Users</div>
+              </div>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0f172a' }}>{analytics.userMetrics.newUsersThisMonth || 0}</div>
+                <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>New This Month</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Operational Lists Row */}
       <div className="grid grid-2" style={{ gap: '2rem' }}>
         <div className="admin-card">
@@ -756,7 +1470,7 @@ const AdminDashboard = () => {
                   'Snack Counter': '#f59e0b',
                   'Juice Counter': '#10b981'
                 };
-                
+
                 return (
                   <div key={product.id} style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', paddingBottom: '1.25rem', borderBottom: idx === 4 ? 'none' : '1px solid #f1f5f9' }}>
                     <div style={{ width: '44px', height: '44px', borderRadius: '10px', overflow: 'hidden', background: '#f8fafc' }}>
@@ -771,10 +1485,10 @@ const AdminDashboard = () => {
                       <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.9375rem', fontWeight: '600', color: '#1e293b' }}>{product.name}</h4>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <p style={{ margin: 0, fontSize: '0.8125rem', color: '#64748b' }}>{formatPrice(product.price)} • {product.totalSales} sold</p>
-                        <span style={{ 
-                          fontSize: '0.6875rem', 
-                          padding: '0.125rem 0.5rem', 
-                          borderRadius: '4px', 
+                        <span style={{
+                          fontSize: '0.6875rem',
+                          padding: '0.125rem 0.5rem',
+                          borderRadius: '4px',
                           background: `${unitColors[serviceUnit]}15`,
                           color: unitColors[serviceUnit],
                           fontWeight: '600'

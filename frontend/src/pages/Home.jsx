@@ -95,7 +95,7 @@ const Home = () => {
     const interval = setInterval(() => {
       currentStep++;
       const progress = currentStep / steps;
-      
+
       setStats({
         orders: Math.floor(targetStats.orders * progress),
         students: Math.floor(targetStats.students * progress),
@@ -709,7 +709,7 @@ const Home = () => {
       <section style={{ padding: '6rem 0', position: 'relative', overflow: 'hidden', background: '#f8fafc' }}>
         <div className="decorative-circle" style={{ width: '400px', height: '400px', top: '-200px', right: '-200px' }}></div>
         <div className="decorative-circle" style={{ width: '300px', height: '300px', bottom: '-150px', left: '-150px' }}></div>
-        
+
         <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem', position: 'relative', zIndex: 1 }}>
           <div className="section-header-enhanced fade-in-up">
             <h2>Why Choose KEC Food Court?</h2>
@@ -894,8 +894,8 @@ const Home = () => {
 
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div className="testimonial-card">
-              <img 
-                src={testimonials[activeTestimonial].image} 
+              <img
+                src={testimonials[activeTestimonial].image}
                 alt={testimonials[activeTestimonial].name}
                 className="testimonial-avatar"
               />
@@ -941,7 +941,7 @@ const Home = () => {
       <section className="newsletter-section">
         <div className="newsletter-bg-shape" style={{ width: '400px', height: '400px', top: '-200px', right: '-200px' }}></div>
         <div className="newsletter-bg-shape" style={{ width: '300px', height: '300px', bottom: '-150px', left: '-150px' }}></div>
-        
+
         <div className="container" style={{ maxWidth: '900px', margin: '0 auto', padding: '0 2rem', textAlign: 'center', position: 'relative', zIndex: 1 }}>
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>📧</div>
           <h2 style={{ fontSize: '2.5rem', fontWeight: '800', marginBottom: '1rem', color: 'white' }}>
@@ -950,7 +950,7 @@ const Home = () => {
           <p style={{ fontSize: '1.2rem', opacity: 0.95, marginBottom: '2rem', color: 'white' }}>
             Subscribe to get daily updates on the menu and special festive delicacies.
           </p>
-          
+
           <form className="newsletter-form" onSubmit={(e) => e.preventDefault()}>
             <input
               type="email"

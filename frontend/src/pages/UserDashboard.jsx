@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FiUser, FiShoppingCart, FiHeart, FiPackage,
-  FiEdit, FiEye, FiMessageSquare, FiStar, FiLogOut, FiSettings
+  FiEdit, FiEye, FiMessageSquare, FiStar, FiLogOut, FiSettings,
+  FiDollarSign, FiClock, FiCheckCircle, FiTruck, FiAward, FiXCircle
 } from 'react-icons/fi';
 import { AiFillStar, AiOutlineStar } from 'react-icons/ai';
 import { useAuth } from '../context/authContext';
@@ -193,8 +194,19 @@ const UserDashboard = () => {
           <>
             <section className="dash-stats-grid">
               <div className="dash-stat-card">
-                <div className="dash-stat-icon"><FiShoppingCart /></div>
-                <div className="dash-stat-info"><h3>Orders</h3><p>{orders.length}</p></div>
+                <div className="dash-stat-icon" style={{ background: '#eff6ff', color: '#3b82f6' }}><FiShoppingCart /></div>
+                <div className="dash-stat-info"><h3>Total Orders</h3><p>{orders.length}</p></div>
+              </div>
+              <div className="dash-stat-card">
+                <div className="dash-stat-icon" style={{ background: '#f0fdf4', color: '#22c55e' }}><FiDollarSign /></div>
+                <div className="dash-stat-info">
+                  <h3>Total Spent</h3>
+                  <p>{formatPrice(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0))}</p>
+                  {/* Debug info - remove in production */}
+                  <small style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    ({orders.length} orders)
+                  </small>
+                </div>
               </div>
               <div className="dash-stat-card">
                 <div className="dash-stat-icon" style={{ background: '#fef2f2', color: '#ef4444' }}><FiHeart /></div>
@@ -203,6 +215,45 @@ const UserDashboard = () => {
               <div className="dash-stat-card">
                 <div className="dash-stat-icon" style={{ background: '#f0fdf4', color: '#22c55e' }}><FiMessageSquare /></div>
                 <div className="dash-stat-info"><h3>Pending Reviews</h3><p>{reviewableProducts.length}</p></div>
+              </div>
+            </section>
+            
+            {/* Order Status Summary */}
+            <section className="dash-stats-grid" style={{ marginTop: '1rem', gridTemplateColumns: 'repeat(5, 1fr)' }}>
+              <div className="dash-stat-card" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                <div className="dash-stat-icon" style={{ background: '#f59e0b', color: 'white' }}><FiClock /></div>
+                <div className="dash-stat-info">
+                  <h3 style={{ fontSize: '0.875rem' }}>Preparing</h3>
+                  <p style={{ fontSize: '1.25rem', fontWeight: '700' }}>{orders.filter(o => o.orderStatus === 'Preparing').length}</p>
+                </div>
+              </div>
+              <div className="dash-stat-card" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                <div className="dash-stat-icon" style={{ background: '#3b82f6', color: 'white' }}><FiCheckCircle /></div>
+                <div className="dash-stat-info">
+                  <h3 style={{ fontSize: '0.875rem' }}>Ready</h3>
+                  <p style={{ fontSize: '1.25rem', fontWeight: '700' }}>{orders.filter(o => o.orderStatus === 'Ready').length}</p>
+                </div>
+              </div>
+              <div className="dash-stat-card" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                <div className="dash-stat-icon" style={{ background: '#0ea5e9', color: 'white' }}><FiTruck /></div>
+                <div className="dash-stat-info">
+                  <h3 style={{ fontSize: '0.875rem' }}>Delivery</h3>
+                  <p style={{ fontSize: '1.25rem', fontWeight: '700' }}>{orders.filter(o => o.orderStatus === 'OutForDelivery').length}</p>
+                </div>
+              </div>
+              <div className="dash-stat-card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <div className="dash-stat-icon" style={{ background: '#22c55e', color: 'white' }}><FiAward /></div>
+                <div className="dash-stat-info">
+                  <h3 style={{ fontSize: '0.875rem' }}>Delivered</h3>
+                  <p style={{ fontSize: '1.25rem', fontWeight: '700' }}>{orders.filter(o => o.orderStatus === 'Delivered').length}</p>
+                </div>
+              </div>
+              <div className="dash-stat-card" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+                <div className="dash-stat-icon" style={{ background: '#ef4444', color: 'white' }}><FiXCircle /></div>
+                <div className="dash-stat-info">
+                  <h3 style={{ fontSize: '0.875rem' }}>Cancelled</h3>
+                  <p style={{ fontSize: '1.25rem', fontWeight: '700' }}>{orders.filter(o => o.orderStatus === 'Cancelled').length}</p>
+                </div>
               </div>
             </section>
 
@@ -228,6 +279,16 @@ const UserDashboard = () => {
                           </tr>
                         ))}
                       </tbody>
+                      {/* Debug: Show raw order data */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <tfoot>
+                          <tr>
+                            <td colSpan="4" style={{ fontSize: '0.7rem', color: '#64748b', padding: '1rem' }}>
+                              Debug: First order totalAmount = {orders[0]?.totalAmount || 'N/A'}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 </div>

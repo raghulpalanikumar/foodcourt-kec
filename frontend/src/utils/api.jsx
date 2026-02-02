@@ -504,10 +504,10 @@ export const api = {
   },
 
   // Update order status
-  updateOrderStatus: async (orderId, status) => {
+  updateOrderStatus: async (orderId, statusData) => {
     const response = await makeRequest(`/orders/${orderId}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(statusData),
     });
     return response.order || response;
   },
@@ -562,6 +562,27 @@ export const api = {
         throw new Error('Server error. Please try again later.');
       } else {
         throw new Error(err.message || 'Failed to fetch analytics');
+      }
+    }
+  },
+
+  // Get Daily Dish-wise Analytics for a specific date
+  getDailyDishAnalytics: async (date) => {
+    try {
+      console.log('Fetching daily dish analytics for:', date);
+      const response = await API.get(`/analytics/daily/${date}`);
+      console.log('Daily analytics response:', response.data);
+      return response.data;
+    } catch (err) {
+      console.error("API error fetching daily analytics:", err);
+      if (err.response?.status === 401) {
+        throw new Error('Unauthorized. Please login as an admin.');
+      } else if (err.response?.status === 403) {
+        throw new Error('Forbidden. Admin access required.');
+      } else if (err.response?.status === 400) {
+        throw new Error('Invalid date format. Use YYYY-MM-DD');
+      } else {
+        throw new Error(err.message || 'Failed to fetch daily analytics');
       }
     }
   },

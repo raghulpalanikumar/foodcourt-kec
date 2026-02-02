@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/', protect, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
-      
+
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -26,13 +26,19 @@ router.get('/', protect, async (req, res) => {
       },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: order.products, // Map products to items
-      products: order.products, // Keep both for compatibility
-      total: order.total,
-      status: order.status || 'pending',
+      items: order.items, // Use correct items field
+      products: order.items, // Keep both for compatibility
+      total: order.totalAmount, // Use correct totalAmount field
+      totalAmount: order.totalAmount, // Explicitly include totalAmount
+      status: order.orderStatus || 'Preparing',
+      orderStatus: order.orderStatus || 'Preparing',
       estimatedWait: order.estimatedWait, // ETA
       alternateFood: order.alternateFood, // Recommended alternative
-      shippingAddress: order.shippingAddress
+      shippingAddress: order.shippingAddress,
+      deliveryType: order.deliveryType,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      tokenNumber: order.tokenNumber
     }));
 
     res.json({
@@ -64,7 +70,7 @@ router.get('/all', protect, async (req, res) => {
     }
 
     const orders = await Order.find(filter)
-      
+
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -82,8 +88,14 @@ router.get('/all', protect, async (req, res) => {
       createdAt: order.createdAt,
       items: order.products,
       products: order.products,
-      total: order.total,
-      status: order.status || 'pending',
+      total: order.totalAmount, // Map totalAmount to total for compatibility
+      totalAmount: order.totalAmount, // Explicitly include totalAmount
+      tokenNumber: order.tokenNumber,
+      status: order.status || order.orderStatus || 'pending', // Check both status fields
+      orderStatus: order.orderStatus || order.status || 'pending',
+      deliveryType: order.deliveryType,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
       estimatedWait: order.estimatedWait, // ETA
       alternateFood: order.alternateFood, // Recommended alternative
       shippingAddress: order.shippingAddress
@@ -190,7 +202,7 @@ router.put('/:id/status', protect, [
 router.get('/:id', protect, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      
+
       .populate('user', 'name email');
 
     if (!order) {
@@ -336,7 +348,7 @@ router.post('/', protect, [
       estimatedWait += 5; // Add 5 mins during lunch rush
     }
 
-    console.log(`📊 ETA Calculation: Base=15 + Quantity(${totalQuantity}x3)=${totalQuantity*3} + PeakHour=${hour >= 12 && hour <= 14 ? 5 : 0} = ${estimatedWait} mins`);
+    console.log(`📊 ETA Calculation: Base=15 + Quantity(${totalQuantity}x3)=${totalQuantity * 3} + PeakHour=${hour >= 12 && hour <= 14 ? 5 : 0} = ${estimatedWait} mins`);
 
     // ===== 🍽️ SMART ALTERNATE FOOD RECOMMENDATION =====
     let alternateFood = null;
@@ -346,7 +358,7 @@ router.post('/', protect, [
 
     if (firstProduct) {
       console.log(`🔍 Finding alternatives for: ${firstProduct.name} (Category: ${firstProduct.category})`);
-      
+
       // Find similar products (same category, different item, in stock)
       const alternatives = await Product.find({
         category: firstProduct.category,
@@ -364,32 +376,32 @@ router.post('/', protect, [
     }
 
     console.log('Creating order in database...');
-    
+
     // 🔥 CRITICAL FIX: Include totalAmount and paymentMethod in order creation
     const order = await Order.create({
       user: req.user._id,
       products: orderProducts,
-      
+
       // 🔥 REQUIRED: totalAmount from frontend (or calculated total as fallback)
       totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
       total: req.body.totalAmount ? Number(req.body.totalAmount) : total, // For backward compatibility
-      
+
       // 🔥 REQUIRED: paymentMethod from frontend
       paymentMethod: req.body.paymentMethod || 'CASH',
-      
+
       // 🔥 REQUIRED: paymentStatus based on payment method
       paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
-      
+
       // 🔥 ETA: Dynamic estimated wait time
       estimatedWait, // Smart calculation based on quantity + peak hours
-      
+
       // 🍽️ ALTERNATE FOOD: Intelligent recommendation
       alternateFood: alternateFood
         ? { name: alternateFood.name, id: alternateFood._id }
         : null,
-      
+
       shippingAddress,
-      
+
       status: 'pending' // Set default status
     });
 
@@ -399,7 +411,7 @@ router.post('/', protect, [
     console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
     console.log('Order alternateFood:', order.alternateFood);
     console.log('Populating order details...');
-    
+
     await order.populate('user', 'name email');
     console.log('Order populated. User email:', order.user?.email);
 

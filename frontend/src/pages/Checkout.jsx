@@ -502,14 +502,13 @@ const Checkout = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Last Name *</label>
+                    <label className="form-label">Last Name</label>
                     <input
                       type="text"
                       name="lastName"
                       className="form-input"
                       value={formData.lastName}
                       onChange={handleInputChange}
-                      required
                     />
                   </div>
                 </div>

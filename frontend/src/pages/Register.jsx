@@ -89,7 +89,8 @@ const Register = () => {
 
       const result = await register(userData);
       if (result.success) {
-        navigate('/');
+        // Redirect to login page after successful registration
+        navigate('/login');
       } else {
         setError(result.message || 'Registration failed. Please try again.');
       }
