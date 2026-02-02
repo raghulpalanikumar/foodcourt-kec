@@ -107,11 +107,20 @@ const AdminDashboard = () => {
   const [salesLoading, setSalesLoading] = useState(false);
   const [chartType, setChartType] = useState('line');
   const [lastUpdated, setLastUpdated] = useState(new Date());
+
+  // Daily Analytics State
+  const [dailyAnalytics, setDailyAnalytics] = useState(null);
+  const [dailyLoading, setDailyLoading] = useState(false);
+
+  // Table Reservations State
   const [tableReservations, setTableReservations] = useState([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
 
   // Product Trend Selection State
   const [selectedProductForTrend, setSelectedProductForTrend] = useState(null);
+
+  // Backup State
+  const [backupLoading, setBackupLoading] = useState(false);
 
   useEffect(() => {
     loadAnalytics();
@@ -131,19 +140,30 @@ const AdminDashboard = () => {
   const loadAnalytics = async () => {
     try {
       const [analyticsRes, trendRes, peakRes] = await Promise.all([
-        api.getAnalytics(),
-        api.getSalesTrend(),
-        api.getProductPeaks()
+        api.getAnalytics().catch(err => {
+          console.error('Error loading analytics:', err);
+          return null;
+        }),
+        api.getSalesTrend().catch(err => {
+          console.error('Error loading sales trend:', err);
+          return { success: false, data: [] };
+        }),
+        api.getProductPeaks().catch(err => {
+          console.error('Error loading product peaks:', err);
+          return { success: false, data: [] };
+        })
       ]);
 
-      const normalized = analyticsRes && typeof analyticsRes === 'object' && 'data' in analyticsRes ? analyticsRes.data : analyticsRes;
-      setAnalytics(normalized);
+      if (analyticsRes) {
+        const normalized = analyticsRes && typeof analyticsRes === 'object' && 'data' in analyticsRes ? analyticsRes.data : analyticsRes;
+        setAnalytics(normalized);
+      }
 
-      if (trendRes.success) {
+      if (trendRes && trendRes.success) {
         setSalesTrend(trendRes.data);
       }
 
-      if (peakRes.success) {
+      if (peakRes && peakRes.success) {
         const peakMap = peakRes.data.reduce((acc, curr) => {
           acc[curr.id] = curr;
           return acc;
@@ -320,10 +340,10 @@ const AdminDashboard = () => {
           <p style={{ color: '#64748b', marginTop: '0.5rem' }}>Live campus dining analytics as of {lastUpdated.toLocaleTimeString()}</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            onClick={handleDatabaseBackup} 
+          <button
+            onClick={handleDatabaseBackup}
             disabled={backupLoading}
-            className="admin-btn-primary" 
+            className="admin-btn-primary"
             style={{ background: '#3b82f6' }}
             title="Backup all database collections as ZIP file"
           >
