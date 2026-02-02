@@ -19,6 +19,7 @@ import { api } from '../utils/api';
 import { formatPrice, formatDate } from "../utils/helpers";
 import { constructImageUrl } from '../utils/imageUtils';
 import { getDemandScore, getDemandLabel, getPrepRecommendation } from '../utils/demandPrediction';
+import { downloadDatabaseBackup } from '../services/backupService';
 import '../styles/admin.css';
 
 ChartJS.register(
@@ -106,12 +107,6 @@ const AdminDashboard = () => {
   const [salesLoading, setSalesLoading] = useState(false);
   const [chartType, setChartType] = useState('line');
   const [lastUpdated, setLastUpdated] = useState(new Date());
-
-  // Daily Analytics State
-  const [dailyAnalytics, setDailyAnalytics] = useState(null);
-  const [dailyLoading, setDailyLoading] = useState(false);
-
-  // Table Reservations State
   const [tableReservations, setTableReservations] = useState([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
 
@@ -239,6 +234,19 @@ const AdminDashboard = () => {
     } catch { alert('Export failed'); }
   };
 
+  const handleDatabaseBackup = async () => {
+    try {
+      setBackupLoading(true);
+      await downloadDatabaseBackup();
+      alert('✅ Backup downloaded successfully!');
+    } catch (error) {
+      console.error('Backup error:', error);
+      alert('❌ Backup failed: ' + error.message);
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '1rem' }}>
       <div className="spinner"></div>
@@ -312,6 +320,15 @@ const AdminDashboard = () => {
           <p style={{ color: '#64748b', marginTop: '0.5rem' }}>Live campus dining analytics as of {lastUpdated.toLocaleTimeString()}</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
+          <button 
+            onClick={handleDatabaseBackup} 
+            disabled={backupLoading}
+            className="admin-btn-primary" 
+            style={{ background: '#3b82f6' }}
+            title="Backup all database collections as ZIP file"
+          >
+            <FiDownload /> <span>{backupLoading ? 'Backing up...' : 'Backup'}</span>
+          </button>
           <button onClick={downloadExcelReport} className="admin-btn-primary" style={{ background: '#10b981' }}>
             <FiDownload /> <span>Export Stats</span>
           </button>
