@@ -63,7 +63,6 @@ router.get('/all', protect, async (req, res) => {
     }
 
     const orders = await Order.find(filter)
-
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -247,29 +246,29 @@ router.get('/:id', protect, async (req, res) => {
 // @route   POST /api/orders
 // @access  Private (logged-in user)
 // ==================
-router.post('/', protect, [
-  body('products').isArray({ min: 1 }).withMessage('Products array is required'),
-  body('products.*.product').notEmpty().withMessage('Product ID is required'),
-  body('products.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1')
-], async (req, res) => {
+router.post('/', protect, async (req, res) => {
   try {
     console.log('Order creation request body:', req.body);
 
-    // Support both items (Razorpay/ReserveTable) and products (COD) formats
-    if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0 && !req.body.products) {
-      req.body.products = req.body.items.map((i) => ({
-        product: i.foodId || i.id || i.productId,
+    // 🛠️ NORMALIZATION: Support both "items" and "products" formats from frontend
+    let products = req.body.products;
+    const items = req.body.items;
+
+    if (items && Array.isArray(items) && items.length > 0 && (!products || !Array.isArray(products) || products.length === 0)) {
+      products = items.map((i) => ({
+        product: i.foodId || i.id || i.productId || i._id,
         name: i.foodName || i.name,
         price: i.price,
         quantity: i.quantity || 1
       }));
+      // Ensure req.body.products is set for any downstream code
+      req.body.products = products;
     }
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+    if (!products || !Array.isArray(products) || products.length === 0) {
       return res.status(400).json({
         success: false,
-        message: errors.array()[0].msg
+        message: 'No products or items provided in order.'
       });
     }
 
@@ -278,6 +277,7 @@ router.post('/', protect, [
 
     // ReserveTable: require reservationSlot
     if (deliveryType === 'ReserveTable') {
+      const slotStart = new Date(req.body.reservationSlot || deliveryDetails.reservationSlot);
       if (!req.body.reservationSlot && !deliveryDetails.reservationSlot) {
         return res.status(400).json({
           success: false,
@@ -292,18 +292,21 @@ router.post('/', protect, [
           message: 'Please select a valid table (1-5)'
         });
       }
-      const slotStart = new Date(req.body.reservationSlot || deliveryDetails.reservationSlot);
-      if (isNaN(slotStart.getTime()) || slotStart < new Date()) {
+      // Today-only enforcement
+      const now = new Date();
+      const today = new Date();
+      const slotDay = new Date(slotStart);
+      today.setHours(0, 0, 0, 0);
+      slotDay.setHours(0, 0, 0, 0);
+
+      // Grace period: Allow slots that started up to 15 mins ago
+      if (isNaN(slotStart.getTime()) || slotStart.getTime() < now.getTime() - (15 * 60 * 1000)) {
         return res.status(400).json({
           success: false,
           message: 'Invalid or past reservation time'
         });
       }
-      // Today-only enforcement
-      const today = new Date();
-      const slotDay = new Date(slotStart);
-      today.setHours(0, 0, 0, 0);
-      slotDay.setHours(0, 0, 0, 0);
+
       if (slotDay.getTime() !== today.getTime()) {
         return res.status(400).json({
           success: false,
@@ -339,8 +342,6 @@ router.post('/', protect, [
         country: 'India'
       };
     }
-
-    const { products } = req.body;
 
     // Validate products and calculate total
     let total = 0;
@@ -428,54 +429,52 @@ router.post('/', protect, [
       }
     }
 
-    // Create the order
-    const order = await Order.create({
+    console.log('Creating order in database...');
+
+    const orderPayload = {
       user: req.user._id,
-      items: products.map(p => ({
+      items: orderProducts.map((p) => ({
         foodId: p.product,
         foodName: p.name,
         price: p.price,
         quantity: p.quantity
       })),
       totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
-      paymentMethod: req.body.paymentMethod || 'CASH',
-      paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
+      // Payment rules: allow CASH (COD) or ONLINE for all options
+      paymentMethod: (req.body.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH'),
+      paymentStatus: (req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending'),
       estimatedWait,
       alternateFood: alternateFood
         ? { name: alternateFood.name, id: alternateFood._id }
         : null,
-      deliveryType,
-      deliveryDetails: {
-        ...deliveryDetails,
-        ...(deliveryType === 'ReserveTable' && {
-          reservationSlot: req.body.reservationSlot || deliveryDetails.reservationSlot,
-          reservationTableNumber: Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber)
-        })
-      },
-      shippingAddress,
-      orderStatus: 'Preparing'
-    });
+      orderStatus: 'Preparing',
+      deliveryType: deliveryType === 'ReserveTable' ? 'ReserveTable' : deliveryType === 'Delivery' ? 'Delivery' : deliveryType === 'Pickup' ? 'Pickup' : deliveryType,
+      deliveryDetails: { ...deliveryDetails }
+    };
 
-    // If it's a table reservation, create the TableReservation record
-    if (deliveryType === 'ReserveTable') {
-      const slotStart = req.body.reservationSlot || deliveryDetails.reservationSlot;
-      const tableNumber = Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber);
+    if (deliveryType === 'ReserveTable' && (req.body.reservationSlot || deliveryDetails.reservationSlot)) {
+      orderPayload.deliveryDetails.reservationSlot = new Date(req.body.reservationSlot || deliveryDetails.reservationSlot);
+      orderPayload.deliveryDetails.reservationTableNumber = Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber);
+    }
 
-      await reservationController.createReservationForOrder(
+    const order = await Order.create(orderPayload);
+
+    // Create table reservation when deliveryType is ReserveTable
+    if (deliveryType === 'ReserveTable' && orderPayload.deliveryDetails.reservationSlot) {
+      const reservation = await reservationController.createReservationForOrder(
         req.user._id,
         order._id,
-        slotStart,
-        tableNumber
+        orderPayload.deliveryDetails.reservationSlot,
+        orderPayload.deliveryDetails.reservationTableNumber
       );
-      console.log(`✅ Table reservation created for Table ${tableNumber} at ${slotStart}`);
+      if (reservation) {
+        order.deliveryDetails = order.deliveryDetails || {};
+        order.deliveryDetails.reservationTableNumber = reservation.tableNumber;
+        await order.save();
+      }
     }
 
     console.log('Order created, ID:', order._id);
-    console.log('Order totalAmount:', order.totalAmount);
-    console.log('Order paymentMethod:', order.paymentMethod);
-    console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
-    console.log('Order alternateFood:', order.alternateFood);
-    console.log('Populating order details...');
 
     await order.populate('user', 'name email');
 

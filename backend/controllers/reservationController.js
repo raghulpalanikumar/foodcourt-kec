@@ -100,6 +100,17 @@ exports.getAvailableSlots = async (req, res) => {
   }
 };
 
+// Helper to check if a specific table is available for a slot
+exports.isTableAvailableForSlot = async (tableNumber, slotStart) => {
+  const start = new Date(slotStart);
+  const end = new Date(start.getTime() + SLOT_MS);
+  const exists = await TableReservation.exists({
+    tableNumber,
+    slotStart: { $gte: start, $lt: end }
+  });
+  return !exists;
+};
+
 // GET table availability for a specific slotStart
 exports.getTablesForSlot = async (req, res) => {
   try {
@@ -226,3 +237,56 @@ exports.createReservationForOrder = async (userId, orderId, slotStart, requested
   });
   return reservation;
 };
+
+// GET all reservations for admin dashboard
+exports.getAllReservationsAdmin = async (req, res) => {
+  try {
+    const { date, upcoming } = req.query;
+    let query = {};
+
+    if (date) {
+      // Filter by specific date
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      query.slotStart = { $gte: startOfDay, $lte: endOfDay };
+    } else if (upcoming === 'true') {
+      // Get only upcoming reservations
+      query.slotStart = { $gte: new Date() };
+    }
+
+    const reservations = await TableReservation.find(query)
+      .populate('user', 'name email')
+      .populate('order', 'tokenNumber totalAmount status deliveryType')
+      .sort({ slotStart: -1 })
+      .lean();
+
+    const formattedReservations = reservations.map(res => ({
+      id: res._id,
+      tableNumber: res.tableNumber,
+      slotStart: res.slotStart,
+      slotEnd: new Date(res.slotStart.getTime() + SLOT_MS),
+      userName: res.user?.name || 'Unknown',
+      userEmail: res.user?.email || 'N/A',
+      tokenNumber: res.order?.tokenNumber || 'N/A',
+      orderAmount: res.order?.totalAmount || 0,
+      orderStatus: res.order?.status || 'pending',
+      deliveryType: res.order?.deliveryType || 'dine-in',
+      createdAt: res.createdAt
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        reservations: formattedReservations,
+        count: formattedReservations.length,
+        totalTables: TOTAL_TABLES
+      }
+    });
+  } catch (err) {
+    console.error('getAllReservationsAdmin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

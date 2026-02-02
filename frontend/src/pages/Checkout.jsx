@@ -737,7 +737,7 @@ const Checkout = () => {
                       <input type="radio" name="deliveryType" value="Delivery" checked={formData.deliveryType === 'Delivery'} onChange={handleInputChange} />
                       <FiTruck size={22} color={formData.deliveryType === 'Delivery' ? '#0066cc' : '#6b7280'} />
                       <div>
-                        <strong>Delivery</strong> — Delivered by our food court. $0 • 15–20 mins
+                        <strong>Delivery</strong> — Delivered by our food court. • 15–20 mins
                       </div>
                     </label>
                     <label style={{
