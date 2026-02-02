@@ -90,6 +90,65 @@ router.get('/', protect, admin, async (req, res) => {
       ];
     }
 
+    // Sales by day (last 30 days) - total products sold per day
+    let salesByDay = [];
+    let peakDay = null;
+
+    // Define startDate outside try block so it's available for dish-wise breakdown
+    const daysBack = 30;
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    startDate.setDate(startDate.getDate() - (daysBack - 1));
+
+    try {
+      const byDayAgg = await Order.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              day: { $dayOfMonth: '$createdAt' }
+            },
+            totalProductsSold: { $sum: '$items.quantity' }
+          }
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
+      ]);
+
+      // build a map for quick lookup
+      const byDayMap = {};
+      byDayAgg.forEach(d => {
+        const yyyy = d._id.year;
+        const mm = String(d._id.month).padStart(2, '0');
+        const dd = String(d._id.day).padStart(2, '0');
+        const key = `${yyyy}-${mm}-${dd}`;
+        byDayMap[key] = d.totalProductsSold || 0;
+      });
+
+      // ensure continuous last-30-days array (include zeros)
+      for (let i = 0; i < daysBack; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const key = `${yyyy}-${mm}-${dd}`;
+        salesByDay.push({ date: key, totalProductsSold: byDayMap[key] || 0 });
+      }
+
+      // find peak day
+      if (salesByDay.length > 0) {
+        const maxVal = Math.max(...salesByDay.map(s => s.totalProductsSold));
+        peakDay = salesByDay.find(s => s.totalProductsSold === maxVal) || salesByDay[0];
+      }
+    } catch (err) {
+      console.error('Error computing salesByDay:', err.message);
+      salesByDay = [];
+      peakDay = null;
+    }
+
     let recentOrders = await Order.find()
       .populate('user', 'name email')
       .sort({ createdAt: -1 })
@@ -111,12 +170,106 @@ router.get('/', protect, admin, async (req, res) => {
       .sort({ numReviews: -1 })
       .limit(5);
 
+    // Dish-wise breakdown - organized by PRODUCT (not by day)
+    let productDailySales = [];
+    let topSellingProducts = [];
+
+    try {
+      // Get all products to ensure they all appear in the explorer
+      const allProductsData = await Product.find({}, 'name price category');
+      const productMap = {};
+
+      allProductsData.forEach(p => {
+        productMap[p._id.toString()] = {
+          productId: p._id.toString(),
+          productName: p.name,
+          price: p.price,
+          totalQuantity: 0,
+          totalRevenue: 0,
+          dailyBreakdown: {}
+        };
+      });
+
+      // Get all products sold in last 30 days with their daily breakdown
+      const productSalesAgg = await Order.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: {
+              foodId: '$items.foodId',
+              foodName: '$items.foodName' || 'Unknown',
+              date: {
+                year: { $year: '$createdAt' },
+                month: { $month: '$createdAt' },
+                day: { $dayOfMonth: '$createdAt' }
+              }
+            },
+            quantity: { $sum: '$items.quantity' },
+            revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+            price: { $first: '$items.price' }
+          }
+        }
+      ]);
+
+      // Populate productMap with aggregation data
+      productSalesAgg.forEach(item => {
+        const productId = item._id.foodId.toString();
+        const yyyy = item._id.date.year;
+        const mm = String(item._id.date.month).padStart(2, '0');
+        const dd = String(item._id.date.day).padStart(2, '0');
+        const dateKey = `${yyyy}-${mm}-${dd}`;
+
+        if (productMap[productId]) {
+          productMap[productId].dailyBreakdown[dateKey] = {
+            quantity: item.quantity,
+            revenue: Number((item.revenue || 0).toFixed(2))
+          };
+
+          productMap[productId].totalQuantity += item.quantity;
+          productMap[productId].totalRevenue += item.revenue || 0;
+
+          // Update price from order items if available
+          if (item.price) productMap[productId].price = item.price;
+        }
+      });
+
+      // Convert to array and sort by total quantity
+      productDailySales = Object.values(productMap)
+        .map(product => ({
+          productId: product.productId,
+          productName: product.productName,
+          price: product.price,
+          totalQuantity: product.totalQuantity,
+          totalRevenue: Number((product.totalRevenue).toFixed(2)),
+          dailyBreakdown: product.dailyBreakdown // { "2026-01-05": {quantity, revenue}, ... }
+        }))
+        .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+      // Get top 10 selling products
+      topSellingProducts = productDailySales.slice(0, 10).map(p => ({
+        productName: p.productName,
+        totalQuantity: p.totalQuantity,
+        totalRevenue: p.totalRevenue,
+        price: p.price
+      }));
+
+    } catch (err) {
+      console.error('Error computing product-wise daily sales:', err.message);
+      productDailySales = [];
+      topSellingProducts = [];
+    }
+
     const analyticsData = {
       totalProducts,
       totalOrders,
       totalUsers,
       totalRevenue: totalRevenueAgg[0]?.total || 0,
       salesByMonth,
+      salesByDay,
+      peakDay,
+      productDailySales,
+      topSellingProducts,
       salesByCategory,
       recentOrders: recentOrdersData,
       topProducts: topProducts.map(product => ({
@@ -135,7 +288,12 @@ router.get('/', protect, admin, async (req, res) => {
         newUsersThisMonth: await User.countDocuments({
           createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
         }),
-        averageOrdersPerUser: totalUsers > 0 ? (totalOrders / totalUsers).toFixed(2) : 0
+        averageOrdersPerUser: totalUsers > 0 ? (totalOrders / totalUsers).toFixed(2) : 0,
+        activeUsersToday: await User.countDocuments({
+          updatedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
+        }),
+        usersWithOrders: await Order.distinct('user').then(users => users.length),
+        usersWithoutOrders: totalUsers - (await Order.distinct('user').then(users => users.length))
       }
     };
 
@@ -150,154 +308,6 @@ router.get('/', protect, admin, async (req, res) => {
       message: 'Error fetching analytics',
       error: error.message
     });
-  }
-});
-
-// GET /api/analytics/daily-product-sales
-router.get('/daily-product-sales', protect, admin, async (req, res) => {
-  try {
-    const requestedDate = req.query.date ? new Date(req.query.date) : new Date();
-    const startOfDay = new Date(requestedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(requestedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    console.log(`📊 Fetching daily sales for: ${startOfDay.toISOString().split('T')[0]}`);
-
-    // Aggregate sales data per product for the specified day
-    const productSalesAgg = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfDay, $lte: endOfDay },
-          orderStatus: { $ne: 'Cancelled' }
-        }
-      },
-      { $unwind: '$items' },
-      {
-        $group: {
-          _id: '$items.foodId',
-          totalSales: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
-          totalQuantity: { $sum: '$items.quantity' },
-          orderCount: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Get all products to show even those with 0 sales
-    const allProducts = await Product.find({}, 'name price image category stock');
-
-    const salesMap = productSalesAgg.reduce((acc, curr) => {
-      acc[curr._id.toString()] = curr;
-      return acc;
-    }, {});
-
-    const report = allProducts.map(prod => {
-      const stats = salesMap[prod._id.toString()] || { totalSales: 0, totalQuantity: 0, orderCount: 0 };
-      return {
-        id: prod._id,
-        name: prod.name,
-        price: prod.price,
-        image: prod.image,
-        category: prod.category,
-        stock: prod.stock,
-        sales: stats.totalSales,
-        quantitySold: stats.totalQuantity,
-        orders: stats.orderCount
-      };
-    }).sort((a, b) => b.sales - a.sales);
-
-    res.json({
-      success: true,
-      data: {
-        date: startOfDay.toISOString().split('T')[0],
-        totalDayRevenue: productSalesAgg.reduce((sum, item) => sum + item.totalSales, 0),
-        products: report
-      }
-    });
-  } catch (error) {
-    console.error('❌ Daily Sales Error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching daily sales' });
-  }
-});
-
-// GET /api/analytics/sales-trend (Last 30 days day-by-day)
-router.get('/sales-trend', protect, admin, async (req, res) => {
-  try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
-
-    const trendAgg = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: thirtyDaysAgo },
-          orderStatus: { $ne: 'Cancelled' }
-        }
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          sales: { $sum: "$totalAmount" },
-          orders: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]);
-
-    res.json({ success: true, data: trendAgg });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching sales trend' });
-  }
-});
-
-// GET /api/analytics/product-peaks (Peak daily sales for each product)
-router.get('/product-peaks', protect, admin, async (req, res) => {
-  try {
-    const peakAgg = await Order.aggregate([
-      { $match: { orderStatus: { $ne: 'Cancelled' } } },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: {
-            productId: "$items.foodId",
-            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
-          },
-          dailyQty: { $sum: "$items.quantity" },
-          dailyRevenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } }
-        }
-      },
-      { $sort: { dailyQty: -1 } },
-      {
-        $group: {
-          _id: "$_id.productId",
-          peakQuantity: { $first: "$dailyQty" },
-          peakDate: { $first: "$_id.date" },
-          peakRevenue: { $max: "$dailyRevenue" }
-        }
-      },
-      {
-        $lookup: {
-          from: 'products',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'product'
-        }
-      },
-      { $unwind: "$product" },
-      {
-        $project: {
-          id: "$_id",
-          name: "$product.name",
-          peakQuantity: 1,
-          peakDate: 1,
-          peakRevenue: 1
-        }
-      }
-    ]);
-
-    res.json({ success: true, data: peakAgg });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching product peaks' });
   }
 });
 

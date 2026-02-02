@@ -960,11 +960,11 @@ const Home = () => {
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </div >
+      </section >
 
       {/* Newsletter */}
-      <section className="newsletter-section">
+      < section className="newsletter-section" >
         <div className="newsletter-bg-shape" style={{ width: '400px', height: '400px', top: '-200px', right: '-200px' }}></div>
         <div className="newsletter-bg-shape" style={{ width: '300px', height: '300px', bottom: '-150px', left: '-150px' }}></div>
 
@@ -1001,8 +1001,8 @@ const Home = () => {
             </div>
           </div>
         </div>
-      </section>
-    </div>
+      </section >
+    </div >
   );
 };
 

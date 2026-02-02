@@ -146,56 +146,111 @@ const sendOrderStatusUpdateEmail = async (userEmail, userName, orderDetails, new
     const transporter = createTransporter();
 
     const statusMessages = {
-      'processing': 'Your order is being processed and will be shipped soon.',
-      'shipped': 'Your order has been shipped and is on its way to you.',
-      'delivered': 'Your order has been delivered successfully.',
-      'cancelled': 'Your order has been cancelled.'
+      'Preparing': 'Your order is being prepared by our kitchen staff.',
+      'Ready': 'Your order is ready for pickup at the food court.',
+      'OutForDelivery': 'Your order is on its way to your classroom.',
+      'Delivered': 'Your order has been delivered successfully.',
+      'Cancelled': 'Your order has been cancelled.'
     };
 
     const statusColors = {
-      'processing': '#ffc107',
-      'shipped': '#17a2b8',
-      'delivered': '#28a745',
-      'cancelled': '#dc3545'
+      'Preparing': '#f59e0b',
+      'Ready': '#3b82f6',
+      'OutForDelivery': '#8b5cf6',
+      'Delivered': '#10b981',
+      'Cancelled': '#ef4444'
+    };
+
+    const statusEmojis = {
+      'Preparing': '👨‍🍳',
+      'Ready': '✅',
+      'OutForDelivery': '🚚',
+      'Delivered': '🎉',
+      'Cancelled': '❌'
     };
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.MAIL_FROM || process.env.EMAIL_USER,
       to: userEmail,
-      subject: `Order Update - Order #${orderDetails.orderId}`,
+      subject: `KEC Food Court - Order Status Update #${orderDetails.tokenNumber}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: ${statusColors[newStatus] || '#6c757d'}; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h2 style="margin: 0;">Order Status Updated</h2>
-            <p style="margin: 10px 0 0 0;">Your order status has been updated to: <strong>${newStatus.toUpperCase()}</strong></p>
-          </div>
-          
-          <div style="background-color: white; padding: 20px; border: 1px solid #dee2e6; border-radius: 8px;">
-            <h3 style="color: #343a40; margin-top: 0;">Order Details</h3>
-            <p><strong>Order ID:</strong> #${orderDetails.orderId}</p>
-            <p><strong>Customer:</strong> ${userName}</p>
-            <p><strong>New Status:</strong> <span style="background-color: ${statusColors[newStatus] || '#6c757d'}; color: white; padding: 4px 8px; border-radius: 4px;">${newStatus.toUpperCase()}</span></p>
-            <p><strong>Total Amount:</strong> ₹${orderDetails.total}</p>
+        <!DOCTYPE html>
+        <html>
+        <body style="background-color: #f1f5f9; padding: 20px; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+          <div style="max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #edf2f7;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 30px 20px; text-align: center; color: white;">
+              <h1 style="margin: 0; font-size: 24px; letter-spacing: 1px;">KEC Food Court</h1>
+              <p style="opacity: 0.9; margin: 10px 0 0 0; font-size: 16px;">Order Status Update</p>
+            </div>
             
-            <div style="background-color: #e9ecef; padding: 15px; border-radius: 4px; margin-top: 20px;">
-              <h4 style="color: #343a40; margin: 0 0 10px 0;">Status Update:</h4>
-              <p style="margin: 0; color: #495057;">${statusMessages[newStatus] || 'Your order status has been updated.'}</p>
+            <!-- Status Banner -->
+            <div style="background-color: ${statusColors[newStatus] || '#64748b'}; color: white; padding: 25px; text-align: center; margin: 20px; border-radius: 12px;">
+              <div style="font-size: 3rem; margin-bottom: 10px;">${statusEmojis[newStatus] || '🔔'}</div>
+              <h2 style="margin: 0 0 10px 0; font-size: 22px;">Status Updated!</h2>
+              <p style="margin: 0; font-size: 18px; font-weight: 600;">${newStatus.toUpperCase()}</p>
+            </div>
+            
+            <!-- Content -->
+            <div style="padding: 30px;">
+              <p style="font-size: 1.1rem; margin-bottom: 20px;">Hello <strong>${userName}</strong>,</p>
+              <p style="color: #475569; line-height: 1.6; margin-bottom: 25px;">We're updating you on your order status. Here are the details:</p>
+              
+              <!-- Order Details Card -->
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+                <h3 style="margin: 0 0 15px 0; color: #1e293b; font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Order Details</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                  <div>
+                    <p style="margin: 8px 0; color: #64748b;"><strong>Token Number:</strong></p>
+                    <p style="margin: 8px 0; color: #64748b;"><strong>Order ID:</strong></p>
+                    <p style="margin: 8px 0; color: #64748b;"><strong>New Status:</strong></p>
+                    <p style="margin: 8px 0; color: #64748b;"><strong>Total Amount:</strong></p>
+                  </div>
+                  <div>
+                    <p style="margin: 8px 0; color: #1e293b; font-weight: 600;">${orderDetails.tokenNumber}</p>
+                    <p style="margin: 8px 0; color: #1e293b; font-weight: 600;">#${orderDetails.orderId}</p>
+                    <p style="margin: 8px 0;">
+                      <span style="background-color: ${statusColors[newStatus] || '#64748b'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">
+                        ${newStatus}
+                      </span>
+                    </p>
+                    <p style="margin: 8px 0; color: #1e293b; font-weight: 700; font-size: 18px;">₹${Number(orderDetails.total || 0).toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                <div style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                  <h4 style="color: #1e293b; margin: 0 0 10px 0; font-size: 15px;">What's Next:</h4>
+                  <p style="margin: 0; color: #475569; line-height: 1.5;">${statusMessages[newStatus] || 'Your order status has been updated.'}</p>
+                </div>
+              </div>
+              
+              <div style="text-align: center; margin-top: 30px; padding: 20px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
+                <p style="margin: 0; color: #1e40af; font-weight: 500;">
+                  Have questions about your order? Contact our support team at the food court counter.
+                </p>
+              </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center; padding: 25px; font-size: 13px; color: #94a3b8; background: #f1f5f9; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 10px 0;">Thank you for choosing KEC Food Court</p>
+              <p style="margin: 5px 0 0 0; font-size: 11px;">Kongu Engineering College Food Court</p>
+              <p style="margin: 5px 0 0 0; font-size: 11px;">Perundurai, Erode - 638060</p>
             </div>
           </div>
-          
-          <div style="text-align: center; margin-top: 20px; color: #6c757d;">
-            <p>Thank you for your patience!</p>
-            <p>If you have any questions, please contact our support team.</p>
-          </div>
-        </div>
+        </body>
+        </html>
       `
     };
 
+    console.log('Sending status update email...');
     const result = await transporter.sendMail(mailOptions);
-    console.log('Order status update email sent successfully:', result.messageId);
+    console.log('Status update email sent successfully:', result.messageId);
     return result;
   } catch (error) {
-    console.error('Error sending order status update email:', error);
+    console.error('ERROR in sendOrderStatusUpdateEmail:', error.message);
+    console.error('Stack trace:', error.stack);
     throw error;
   }
 };

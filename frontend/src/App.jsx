@@ -112,7 +112,7 @@ const AdminLayout = ({ children }) => {
           </Link>
           <Link to="/admin/products" className={`admin-nav-link ${isActive('/admin/products') ? 'active' : ''}`}>
             <FiPackage />
-            <span>Products</span>
+            <span>Dishes</span>
           </Link>
           <Link to="/admin/orders" className={`admin-nav-link ${isActive('/admin/orders') ? 'active' : ''}`}>
             <FiShoppingCart />

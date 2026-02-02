@@ -387,8 +387,12 @@ export const api = {
     return response.order || response;
   },
 
-  updateOrderStatus: async (orderId, status) => {
-    const response = await makeRequest(`/orders/${orderId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+  // Update order status
+  updateOrderStatus: async (orderId, statusData) => {
+    const response = await makeRequest(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(statusData),
+    });
     return response.order || response;
   },
 
@@ -396,6 +400,27 @@ export const api = {
   getAnalytics: async () => {
     const response = await API.get('/analytics');
     return response.data;
+  },
+
+  // Get Daily Dish-wise Analytics for a specific date
+  getDailyDishAnalytics: async (date) => {
+    try {
+      console.log('Fetching daily dish analytics for:', date);
+      const response = await API.get(`/analytics/daily/${date}`);
+      console.log('Daily analytics response:', response.data);
+      return response.data;
+    } catch (err) {
+      console.error("API error fetching daily analytics:", err);
+      if (err.response?.status === 401) {
+        throw new Error('Unauthorized. Please login as an admin.');
+      } else if (err.response?.status === 403) {
+        throw new Error('Forbidden. Admin access required.');
+      } else if (err.response?.status === 400) {
+        throw new Error('Invalid date format. Use YYYY-MM-DD');
+      } else {
+        throw new Error(err.message || 'Failed to fetch daily analytics');
+      }
+    }
   },
 
   getDailySales: async (date) => {

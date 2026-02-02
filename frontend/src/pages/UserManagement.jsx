@@ -22,17 +22,45 @@ const UserManagement = () => {
     try {
       setError(null);
       setLoading(true);
-      const userData = await api.getUsers();
-      const transformedUsers = userData.map(user => ({
-        id: user._id || user.id,
-        name: user.name || 'Unknown',
-        email: user.email || 'No email',
-        joinDate: user.createdAt || user.joinDate || new Date().toISOString(),
-        orders: user.orders || 0,
-        totalSpent: user.totalSpent || 0,
-        status: user.status || 'active',
-        role: user.role || 'user'
-      }));
+      
+      // Fetch users and orders in parallel
+      const [userData, ordersData] = await Promise.all([
+        api.getUsers(),
+        api.getOrders()
+      ]);
+      
+      // Create a map to count orders per user
+      const orderCounts = {};
+      const totalSpent = {};
+      
+      // Process orders to count per user
+      ordersData.forEach(order => {
+        const userId = order.user?._id || order.user || order.userId;
+        if (userId) {
+          if (!orderCounts[userId]) {
+            orderCounts[userId] = 0;
+            totalSpent[userId] = 0;
+          }
+          orderCounts[userId] += 1;
+          totalSpent[userId] += order.totalAmount || 0;
+        }
+      });
+      
+      // Transform users with order data
+      const transformedUsers = userData.map(user => {
+        const userId = user._id || user.id;
+        return {
+          id: userId,
+          name: user.name || 'Unknown',
+          email: user.email || 'No email',
+          joinDate: user.createdAt || user.joinDate || new Date().toISOString(),
+          orders: orderCounts[userId] || 0,
+          totalSpent: totalSpent[userId] || 0,
+          status: user.status || 'active',
+          role: user.role || 'user'
+        };
+      });
+      
       setUsers(transformedUsers);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -175,7 +203,7 @@ const UserManagement = () => {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button onClick={() => handleViewOrder(user)} className="admin-quick-btn" style={{ padding: '0.5rem', borderRadius: '8px' }}>
+                        <button onClick={() => handleViewUser(user)} className="admin-quick-btn" style={{ padding: '0.5rem', borderRadius: '8px' }}>
                           <FiEye style={{ color: '#3b82f6' }} />
                         </button>
                         <select
