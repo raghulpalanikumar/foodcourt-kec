@@ -98,23 +98,80 @@ const calculateMetrics = (items = []) => {
 
 const AdminDashboard = () => {
   const [analytics, setAnalytics] = useState(null);
+  const [dailySales, setDailySales] = useState(null);
+  const [salesTrend, setSalesTrend] = useState([]);
+  const [productPeaks, setProductPeaks] = useState({});
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
+  const [salesLoading, setSalesLoading] = useState(false);
   const [chartType, setChartType] = useState('line');
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [tableReservations, setTableReservations] = useState([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
 
   useEffect(() => {
     loadAnalytics();
+    loadDailySales(selectedDate);
+    loadTableReservations(selectedDate);
     const intervalId = setInterval(() => {
       loadAnalytics();
-    }, 30000); // 30s refresh for live kitchen
+      loadDailySales(selectedDate);
+      loadTableReservations(selectedDate);
+    }, 60000); // 60s refresh
     return () => clearInterval(intervalId);
-  }, []);
+  }, [selectedDate]);
+
+  const loadDailySales = async (date) => {
+    try {
+      setSalesLoading(true);
+      const res = await api.getDailySales(date);
+      if (res.success) {
+        setDailySales(res.data);
+      }
+    } catch (error) {
+      console.error('Error loading daily sales:', error);
+    } finally {
+      setSalesLoading(false);
+    }
+  };
+
+  const loadTableReservations = async (date) => {
+    try {
+      setReservationsLoading(true);
+      const res = await api.getTableReservations({ date });
+      if (res.success) {
+        setTableReservations(res.data.reservations || []);
+      }
+    } catch (error) {
+      console.error('Error loading table reservations:', error);
+    } finally {
+      setReservationsLoading(false);
+    }
+  };
 
   const loadAnalytics = async () => {
     try {
-      const data = await api.getAnalytics();
-      const normalized = data && typeof data === 'object' && 'data' in data ? data.data : data;
+      const [analyticsRes, trendRes, peakRes] = await Promise.all([
+        api.getAnalytics(),
+        api.getSalesTrend(),
+        api.getProductPeaks()
+      ]);
+
+      const normalized = analyticsRes && typeof analyticsRes === 'object' && 'data' in analyticsRes ? analyticsRes.data : analyticsRes;
       setAnalytics(normalized);
+
+      if (trendRes.success) {
+        setSalesTrend(trendRes.data);
+      }
+
+      if (peakRes.success) {
+        const peakMap = peakRes.data.reduce((acc, curr) => {
+          acc[curr.id] = curr;
+          return acc;
+        }, {});
+        setProductPeaks(peakMap);
+      }
+
       setLastUpdated(new Date());
     } catch (error) {
       console.error('AdminDashboard: Error loading analytics:', error);
@@ -265,6 +322,53 @@ const AdminDashboard = () => {
           <div className="admin-stat-info">
             <h3>Daily Revenue</h3>
             <p>{formatPrice(analytics.totalRevenue || analytics.total_revenue || 0)}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 📈 NEW: DAILY SALES TREND (LAST 30 DAYS) */}
+      <section className="admin-card" style={{ marginBottom: '2.5rem' }}>
+        <div className="admin-card-header">
+          <h2>30-Day Daily Sales Trend</h2>
+          <span style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: '500' }}>Day-by-day revenue performance</span>
+        </div>
+        <div className="admin-card-body">
+          <div style={{ height: '300px' }}>
+            <Line
+              data={{
+                labels: salesTrend.map(t => formatDate(t._id)),
+                datasets: [
+                  {
+                    label: 'Daily Revenue',
+                    data: salesTrend.map(t => t.sales),
+                    borderColor: '#4f46e5',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                  }
+                ]
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: (context) => `Revenue: ${formatPrice(context.parsed.y)}`
+                    }
+                  }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: { callback: (value) => '₹' + value }
+                  }
+                }
+              }}
+            />
           </div>
         </div>
       </section>
@@ -827,6 +931,226 @@ const AdminDashboard = () => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 📊 NEW SECTION: DAILY PRODUCT ANALYSIS */}
+      <div className="row mt-4">
+        <div className="col-12 mb-4">
+          <div className="card shadow-sm border-0" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+            <div className="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+              <div>
+                <h5 className="mb-0 fw-bold" style={{ color: '#1e293b' }}>
+                  <FiPieChart className="me-2" /> Daily Products Performance
+                </h5>
+                <p className="text-muted small mb-0">Detailed breakdown of products in database and their sales for {selectedDate}</p>
+              </div>
+              <div className="d-flex gap-2">
+                <input
+                  type="date"
+                  className="form-control form-control-sm border-light bg-light"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{ width: '160px', borderRadius: '8px' }}
+                />
+                <button
+                  className="btn btn-sm btn-light d-flex align-items-center"
+                  onClick={() => loadDailySales(selectedDate)}
+                  disabled={salesLoading}
+                >
+                  <FiRefreshCw className={salesLoading ? 'spin' : ''} />
+                </button>
+              </div>
+            </div>
+            <div className="card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.875rem' }}>
+                  <thead style={{ background: '#f8fafc' }}>
+                    <tr>
+                      <th className="px-4 py-3 border-0">Product Details</th>
+                      <th className="py-3 border-0">Category</th>
+                      <th className="py-3 border-0">Current Stock</th>
+                      <th className="py-3 border-0">Qty Sold (Day)</th>
+                      <th className="py-3 border-0">Revenue (Day)</th>
+                      <th className="py-3 border-0">Lifetime Peak</th>
+                      <th className="py-3 border-0">Popularity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesLoading ? (
+                      <tr><td colSpan="7" className="text-center py-5">Loading sales data...</td></tr>
+                    ) : dailySales?.products?.length > 0 ? (
+                      dailySales.products.map(product => {
+                        const popularity = Math.min((product.quantitySold / 20) * 100, 100);
+                        return (
+                          <tr key={product.id}>
+                            <td className="px-4 py-3 border-bottom border-light">
+                              <div className="d-flex align-items-center">
+                                <img
+                                  src={constructImageUrl(product.image)}
+                                  alt={product.name}
+                                  onError={(e) => e.target.src = createFallbackImage()}
+                                  style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }}
+                                  className="me-3"
+                                />
+                                <div>
+                                  <div className="fw-bold text-dark">{product.name}</div>
+                                  <div className="text-muted" style={{ fontSize: '0.75rem' }}>ID: {product.id.substring(0, 8)}...</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className="badge bg-light text-dark fw-normal border" style={{ borderRadius: '6px' }}>
+                                {product.category}
+                              </span>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className={`fw-bold ${product.stock < 10 ? 'text-danger' : 'text-dark'}`}>
+                                {product.stock}
+                              </span>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className="fw-bold">{product.quantitySold}</span>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className="fw-bold text-success">{formatPrice(product.sales)}</span>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              {productPeaks[product.id] ? (
+                                <div>
+                                  <div className="fw-bold text-primary">{productPeaks[product.id].peakQuantity} units</div>
+                                  <div className="text-muted" style={{ fontSize: '0.7rem' }}>on {formatDate(productPeaks[product.id].peakDate)}</div>
+                                </div>
+                              ) : (
+                                <span className="text-muted">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 border-bottom border-light pr-4">
+                              <div className="d-flex align-items-center" style={{ width: '100px' }}>
+                                <div className="progress flex-grow-1" style={{ height: '6px', borderRadius: '4px' }}>
+                                  <div
+                                    className="progress-bar bg-primary"
+                                    style={{ width: `${popularity}%`, borderRadius: '4px' }}
+                                  ></div>
+                                </div>
+                                <span className="ms-2 text-muted x-small">{Math.round(popularity)}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr><td colSpan="7" className="text-center py-5">No products found for this day.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 🪑 TABLE RESERVATIONS SECTION */}
+      <div className="row mt-4">
+        <div className="col-12 mb-4">
+          <div className="card shadow-sm border-0" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+            <div className="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+              <div>
+                <h5 className="mb-0 fw-bold" style={{ color: '#1e293b' }}>
+                  🪑 Table Reservations
+                </h5>
+                <p className="text-muted small mb-0">Current table bookings for {selectedDate}</p>
+              </div>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-sm btn-light d-flex align-items-center"
+                  onClick={() => loadTableReservations(selectedDate)}
+                  disabled={reservationsLoading}
+                >
+                  <FiRefreshCw className={reservationsLoading ? 'spin' : ''} />
+                </button>
+              </div>
+            </div>
+            <div className="card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.875rem' }}>
+                  <thead style={{ background: '#f8fafc' }}>
+                    <tr>
+                      <th className="px-4 py-3 border-0">Table #</th>
+                      <th className="py-3 border-0">Time Slot</th>
+                      <th className="py-3 border-0">Customer</th>
+                      <th className="py-3 border-0">Token #</th>
+                      <th className="py-3 border-0">Amount</th>
+                      <th className="py-3 border-0">Type</th>
+                      <th className="py-3 border-0">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reservationsLoading ? (
+                      <tr><td colSpan="7" className="text-center py-5">Loading reservations...</td></tr>
+                    ) : tableReservations.length > 0 ? (
+                      tableReservations.map(reservation => {
+                        const slotStart = new Date(reservation.slotStart);
+                        const slotEnd = new Date(reservation.slotEnd);
+                        const timeSlot = `${slotStart.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })} - ${slotEnd.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+
+                        return (
+                          <tr key={reservation.id}>
+                            <td className="px-4 py-3 border-bottom border-light">
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '8px',
+                                background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
+                                color: '#fff',
+                                fontWeight: '700',
+                                fontSize: '1rem'
+                              }}>
+                                {reservation.tableNumber}
+                              </div>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <div className="fw-bold text-dark">{timeSlot}</div>
+                              <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                {slotStart.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                              </div>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <div className="fw-bold text-dark">{reservation.userName}</div>
+                              <div className="text-muted" style={{ fontSize: '0.75rem' }}>{reservation.userEmail}</div>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className="badge bg-primary bg-opacity-10 text-primary fw-bold border border-primary" style={{ borderRadius: '6px', padding: '0.375rem 0.75rem' }}>
+                                #{reservation.tokenNumber}
+                              </span>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className="fw-bold text-success">{formatPrice(reservation.orderAmount)}</span>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className={`badge ${reservation.deliveryType === 'dine-in' ? 'bg-info' : 'bg-warning'} bg-opacity-10 text-${reservation.deliveryType === 'dine-in' ? 'info' : 'warning'} fw-normal border`} style={{ borderRadius: '6px' }}>
+                                {reservation.deliveryType}
+                              </span>
+                            </td>
+                            <td className="py-3 border-bottom border-light">
+                              <span className={`admin-badge badge-${(reservation.orderStatus || 'pending').toLowerCase()}`}>
+                                {reservation.orderStatus}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr><td colSpan="7" className="text-center py-5">No table reservations found for this date.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

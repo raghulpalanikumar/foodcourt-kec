@@ -153,4 +153,152 @@ router.get('/', protect, admin, async (req, res) => {
   }
 });
 
+// GET /api/analytics/daily-product-sales
+router.get('/daily-product-sales', protect, admin, async (req, res) => {
+  try {
+    const requestedDate = req.query.date ? new Date(req.query.date) : new Date();
+    const startOfDay = new Date(requestedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(requestedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    console.log(`📊 Fetching daily sales for: ${startOfDay.toISOString().split('T')[0]}`);
+
+    // Aggregate sales data per product for the specified day
+    const productSalesAgg = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+          orderStatus: { $ne: 'Cancelled' }
+        }
+      },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.foodId',
+          totalSales: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          totalQuantity: { $sum: '$items.quantity' },
+          orderCount: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Get all products to show even those with 0 sales
+    const allProducts = await Product.find({}, 'name price image category stock');
+
+    const salesMap = productSalesAgg.reduce((acc, curr) => {
+      acc[curr._id.toString()] = curr;
+      return acc;
+    }, {});
+
+    const report = allProducts.map(prod => {
+      const stats = salesMap[prod._id.toString()] || { totalSales: 0, totalQuantity: 0, orderCount: 0 };
+      return {
+        id: prod._id,
+        name: prod.name,
+        price: prod.price,
+        image: prod.image,
+        category: prod.category,
+        stock: prod.stock,
+        sales: stats.totalSales,
+        quantitySold: stats.totalQuantity,
+        orders: stats.orderCount
+      };
+    }).sort((a, b) => b.sales - a.sales);
+
+    res.json({
+      success: true,
+      data: {
+        date: startOfDay.toISOString().split('T')[0],
+        totalDayRevenue: productSalesAgg.reduce((sum, item) => sum + item.totalSales, 0),
+        products: report
+      }
+    });
+  } catch (error) {
+    console.error('❌ Daily Sales Error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching daily sales' });
+  }
+});
+
+// GET /api/analytics/sales-trend (Last 30 days day-by-day)
+router.get('/sales-trend', protect, admin, async (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const trendAgg = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: thirtyDaysAgo },
+          orderStatus: { $ne: 'Cancelled' }
+        }
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          sales: { $sum: "$totalAmount" },
+          orders: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.json({ success: true, data: trendAgg });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching sales trend' });
+  }
+});
+
+// GET /api/analytics/product-peaks (Peak daily sales for each product)
+router.get('/product-peaks', protect, admin, async (req, res) => {
+  try {
+    const peakAgg = await Order.aggregate([
+      { $match: { orderStatus: { $ne: 'Cancelled' } } },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: {
+            productId: "$items.foodId",
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
+          },
+          dailyQty: { $sum: "$items.quantity" },
+          dailyRevenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } }
+        }
+      },
+      { $sort: { dailyQty: -1 } },
+      {
+        $group: {
+          _id: "$_id.productId",
+          peakQuantity: { $first: "$dailyQty" },
+          peakDate: { $first: "$_id.date" },
+          peakRevenue: { $max: "$dailyRevenue" }
+        }
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'product'
+        }
+      },
+      { $unwind: "$product" },
+      {
+        $project: {
+          id: "$_id",
+          name: "$product.name",
+          peakQuantity: 1,
+          peakDate: 1,
+          peakRevenue: 1
+        }
+      }
+    ]);
+
+    res.json({ success: true, data: peakAgg });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching product peaks' });
+  }
+});
+
 module.exports = router;
