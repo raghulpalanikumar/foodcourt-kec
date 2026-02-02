@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FiTruck, FiLock, FiCheck, FiDollarSign, FiCreditCard, FiShield, FiShoppingCart, FiClock, FiMapPin, FiPackage } from 'react-icons/fi';
 import { useCart } from '../context/cartContext';
@@ -6,6 +6,7 @@ import { useAuth } from '../context/authContext';
 import { api } from '../utils/api';
 import { formatPrice } from '../utils/helpers';
 import Image from '../components/Image';
+import { constructImageUrl } from '../utils/imageUtils';
 
 const Checkout = () => {
   const { cartItems, getCartTotal, clearCart } = useCart();
@@ -16,7 +17,7 @@ const Checkout = () => {
   const [orderPlaced, setOrderPlaced] = useState(false);
   // Payment method (COD allowed for all options)
   const [paymentMethod, setPaymentMethod] = useState('cod');
-  
+
   // 🔥 NEW: State for Smart Queue Intelligence
   const [orderIntel, setOrderIntel] = useState(null);
 
@@ -48,7 +49,7 @@ const Checkout = () => {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [nextAvailableTime, setNextAvailableTime] = useState(null);
   const [reservationLoading, setReservationLoading] = useState(false);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
   const [availableTables, setAvailableTables] = useState([]);
   const [takenTables, setTakenTables] = useState([]);
   const [tablesLoading, setTablesLoading] = useState(false);
@@ -58,13 +59,13 @@ const Checkout = () => {
 
   // (No restriction: COD allowed for ReserveTable too)
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-  };
+  }, []);
 
   // Calculate totals
   const subtotal = isBuyNow
@@ -171,24 +172,16 @@ const Checkout = () => {
         paymentId: paymentResponse.razorpay_payment_id,
         deliveryType: formData.deliveryType,
         deliveryDetails: {
-          tableNumber: formData.tableNumber,
           classroomInfo: formData.classroomInfo,
           department: formData.department,
           block: formData.block,
-          ...(formData.deliveryType === 'ReserveTable' && formData.reservationSlot
-            ? { reservationSlot: formData.reservationSlot }
-            : {})
-          ,
-          ...(formData.deliveryType === 'ReserveTable' && selectedTable
-            ? { reservationTableNumber: Number(selectedTable) }
-            : {})
+          ...(formData.deliveryType === 'ReserveTable' && {
+            reservationSlot: formData.reservationSlot,
+            reservationTableNumber: Number(selectedTable)
+          })
         },
-        ...(formData.deliveryType === 'ReserveTable' && formData.reservationSlot
-          ? { reservationSlot: formData.reservationSlot }
-          : {}),
-        ...(formData.deliveryType === 'ReserveTable' && selectedTable
-          ? { reservationTableNumber: Number(selectedTable) }
-          : {}),
+        reservationSlot: formData.deliveryType === 'ReserveTable' ? formData.reservationSlot : undefined,
+        reservationTableNumber: formData.deliveryType === 'ReserveTable' ? Number(selectedTable) : undefined,
         totalAmount: total
       };
 
@@ -252,36 +245,26 @@ const Checkout = () => {
       } else {
         // COD flow (including ReserveTable)
         const orderData = {
-          products: checkoutItems.map((item) => ({
-            product: item.productId || item.id || item._id,
-            name: item.name,
+          items: checkoutItems.map((item) => ({
+            foodId: item.productId || item.id || item._id,
+            foodName: item.name,
             price: item.price,
             quantity: item.quantity || 1
           })),
-          totalAmount: checkoutItems.reduce(
-            (sum, item) => sum + item.price * (item.quantity || 1),
-            0
-          ),
+          totalAmount: total,
           paymentMethod: 'CASH',
           deliveryType: formData.deliveryType,
           deliveryDetails: {
             classroomInfo: formData.classroomInfo,
             department: formData.department,
-            block: formData.block
-            ,
-            ...(formData.deliveryType === 'ReserveTable' && formData.reservationSlot
-              ? { reservationSlot: formData.reservationSlot }
-              : {}),
-            ...(formData.deliveryType === 'ReserveTable' && selectedTable
-              ? { reservationTableNumber: Number(selectedTable) }
-              : {})
+            block: formData.block,
+            ...(formData.deliveryType === 'ReserveTable' && {
+              reservationSlot: formData.reservationSlot,
+              reservationTableNumber: Number(selectedTable)
+            })
           },
-          ...(formData.deliveryType === 'ReserveTable' && formData.reservationSlot
-            ? { reservationSlot: formData.reservationSlot }
-            : {}),
-          ...(formData.deliveryType === 'ReserveTable' && selectedTable
-            ? { reservationTableNumber: Number(selectedTable) }
-            : {}),
+          reservationSlot: formData.deliveryType === 'ReserveTable' ? formData.reservationSlot : undefined,
+          reservationTableNumber: formData.deliveryType === 'ReserveTable' ? Number(selectedTable) : undefined,
           shippingAddress: {
             address:
               formData.deliveryType === 'Pickup'
@@ -309,6 +292,7 @@ const Checkout = () => {
       alert('There was an issue creating your order. Please try again.');
     } finally {
       setLoading(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -318,41 +302,60 @@ const Checkout = () => {
     }
   }, [checkoutItems.length, orderPlaced, navigate]);
 
+  const fetchSlots = useCallback(async () => {
+    if (formData.deliveryType !== 'ReserveTable') return;
+
+    setReservationLoading(true);
+    setAvailableSlots([]);
+    setNextAvailableTime(null);
+    setTablesError(null);
+
+    try {
+      console.log('Fetching slots from /reservations/availability...');
+      // Pass the local todayStr to synchronize date with server
+      const response = await api.get(`/reservations/availability?date=${todayStr}`);
+      console.log('Slots response:', response);
+
+      if (response.data?.success) {
+        const slots = response.data.data.slots || [];
+        setAvailableSlots(slots);
+
+        // 🔥 Auto-select first NON-FULL slot for theater-like experience
+        if (slots.length > 0 && !formData.reservationSlot) {
+          const firstAvailable = slots.find(s => !s.isFull);
+          if (firstAvailable) {
+            handleInputChange({ target: { name: 'reservationSlot', value: firstAvailable.slotStart } });
+          }
+        }
+
+        const validSlots = slots.filter(s => !s.isFull);
+        if (validSlots.length === 0) {
+          console.log('No slots for today, fetching next available...');
+          const nextRes = await api.get('/reservations/next-available');
+          if (nextRes.data?.success) {
+            setNextAvailableTime(nextRes.data.data);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching slots:', err);
+      setTablesError('Failed to load timings. Please try again.');
+    } finally {
+      setReservationLoading(false);
+    }
+  }, [formData.deliveryType, todayStr, formData.reservationSlot, handleInputChange]);
+
   // Fetch available reservation slots when ReserveTable is selected
   useEffect(() => {
-    if (formData.deliveryType !== 'ReserveTable') {
+    if (formData.deliveryType === 'ReserveTable') {
+      fetchSlots();
+    } else {
       setAvailableSlots([]);
       setNextAvailableTime(null);
       setAvailableTables([]);
       setSelectedTable('');
-      return;
     }
-    let cancelled = false;
-    setReservationLoading(true);
-    setAvailableSlots([]);
-    setNextAvailableTime(null);
-    api.get(`/reservations/availability`)
-      .then((res) => {
-        if (!cancelled && res.data?.success && res.data?.data?.slots) {
-          setAvailableSlots(res.data.data.slots);
-          if (res.data.data.slots.length === 0) {
-            return api.get(`/reservations/next-available`);
-          }
-        }
-      })
-      .then((nextRes) => {
-        if (!cancelled && nextRes?.data?.success && nextRes?.data?.data) {
-          setNextAvailableTime(nextRes.data.data);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setAvailableSlots([]);
-      })
-      .finally(() => {
-        if (!cancelled) setReservationLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [formData.deliveryType]);
+  }, [formData.deliveryType, fetchSlots]);
 
   // Fetch table availability for selected slot (today only)
   useEffect(() => {
@@ -378,6 +381,12 @@ const Checkout = () => {
           setAvailableTables(avail);
           setTakenTables(taken);
           setTablesLoaded(true);
+
+          // 🔥 Auto-select first free table
+          if (avail.length > 0) {
+            setSelectedTable(String(avail[0]));
+          }
+
           if (avail.length === 0) {
             return api.get(`/reservations/next-available?from=${encodeURIComponent(formData.reservationSlot)}`);
           }
@@ -589,6 +598,39 @@ const Checkout = () => {
           <p style={{ margin: 0, opacity: 0.9, fontSize: '1rem' }}>
             Complete your order in just a few steps
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              setFormData({
+                firstName: user?.name?.split(' ')[0] || '',
+                lastName: user?.name?.split(' ')[1] || '',
+                email: user?.email || '',
+                phone: '',
+                deliveryType: 'Pickup',
+                tableNumber: '',
+                classroomInfo: '',
+                department: '',
+                block: '',
+                reservationSlot: '',
+              });
+              setSelectedTable('');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            style={{
+              marginTop: '1rem',
+              background: 'rgba(255,255,255,0.2)',
+              border: '1px solid rgba(255,255,255,0.4)',
+              color: 'white',
+              padding: '0.4rem 1rem',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              backdropFilter: 'blur(4px)'
+            }}
+          >
+            Reset Form
+          </button>
         </div>
         <div style={{
           position: 'absolute',
@@ -714,87 +756,205 @@ const Checkout = () => {
 
                 {formData.deliveryType === 'ReserveTable' && (
                   <div className="form-group" style={{ marginTop: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                    <label className="form-label">Choose time slot (Today: {todayStr}) *</label>
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <label className="form-label" style={{ fontSize: '0.875rem' }}>Time slot (30 mins)</label>
-                      <select
-                        name="reservationSlot"
-                        className="form-input"
-                        value={formData.reservationSlot}
-                        onChange={(e) => {
-                          setSelectedTable('');
-                          handleInputChange(e);
-                        }}
-                        required={formData.deliveryType === 'ReserveTable'}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <label className="form-label" style={{ marginBottom: 0 }}>Choose time slot (Today: {todayStr}) *</label>
+                      <button
+                        type="button"
+                        onClick={fetchSlots}
                         disabled={reservationLoading}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '4px',
+                          background: '#0ea5e9',
+                          color: 'white',
+                          border: 'none',
+                          cursor: 'pointer'
+                        }}
                       >
-                        <option value="">Select time</option>
-                        {availableSlots.map((slot) => (
-                          <option key={slot.slotStart} value={slot.slotStart}>{slot.label}</option>
-                        ))}
-                      </select>
+                        {reservationLoading ? 'Refreshing...' : 'Refresh Timings'}
+                      </button>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.875rem' }}>Select Time Slot</label>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                        gap: '0.5rem',
+                        marginTop: '0.5rem'
+                      }}>
+                        {availableSlots.map((slot) => {
+                          const isSelected = formData.reservationSlot === slot.slotStart;
+                          return (
+                            <button
+                              key={slot.slotStart}
+                              type="button"
+                              disabled={slot.isFull || reservationLoading}
+                              onClick={() => {
+                                setSelectedTable('');
+                                handleInputChange({ target: { name: 'reservationSlot', value: slot.slotStart } });
+                              }}
+                              style={{
+                                padding: '0.75rem 0.5rem',
+                                borderRadius: '10px',
+                                border: isSelected ? '2px solid #0066cc' : '1px solid #e5e7eb',
+                                background: slot.isFull ? '#f3f4f6' : isSelected ? '#ffffff' : '#ffffff',
+                                cursor: slot.isFull ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                opacity: slot.isFull ? 0.6 : 1,
+                                position: 'relative',
+                                boxShadow: isSelected ? '0 4px 12px rgba(0, 102, 204, 0.15)' : 'none',
+                                transform: isSelected ? 'translateY(-2px)' : 'none',
+                                overflow: 'hidden'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!slot.isFull && !isSelected) {
+                                  e.currentTarget.style.borderColor = '#0066cc';
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                  e.currentTarget.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.05)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!slot.isFull && !isSelected) {
+                                  e.currentTarget.style.borderColor = '#e5e7eb';
+                                  e.currentTarget.style.transform = 'none';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }
+                              }}
+                            >
+                              {isSelected && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '4px',
+                                  right: '4px',
+                                  color: '#0066cc'
+                                }}>
+                                  <FiCheck size={12} />
+                                </div>
+                              )}
+                              <span style={{
+                                fontWeight: '700',
+                                color: slot.isFull ? '#9ca3af' : isSelected ? '#0066cc' : '#1f2937',
+                                fontSize: '0.9rem'
+                              }}>
+                                {slot.label}
+                              </span>
+                              <span style={{
+                                fontSize: '0.65rem',
+                                fontWeight: '700',
+                                color: slot.isFull ? '#ef4444' : isSelected ? '#0066cc' : '#059669',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.025em'
+                              }}>
+                                {slot.isFull ? 'Full' : `${slot.remainingTables} TBL`}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {availableSlots.length === 0 && !reservationLoading && !nextAvailableTime && (
+                        <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>No time slots are currently available for today.</p>
+                      )}
                     </div>
 
                     {formData.reservationSlot && (
-                      <div style={{ marginTop: '0.75rem' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a', marginBottom: '0.5rem' }}>
-                          Select your table
+                      <div style={{ marginTop: '1rem', animation: 'fadeIn 0.3s ease' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                            Interactive Table Map
+                          </span>
+                          <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.7rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#ffffff', border: '1px solid #e2e8f0' }}></div>
+                              Free
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#fee2e2' }}></div>
+                              Booked
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(0,102,204,0.12)', border: '1px solid #0066cc' }}></div>
+                              Selected
+                            </div>
+                          </div>
                         </div>
+
                         {tablesError && (
-                          <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: '#b91c1c' }}>
+                          <p style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#b91c1c', background: '#fef2f2', padding: '0.5rem', borderRadius: '4px' }}>
                             {tablesError}
                           </p>
                         )}
-                        {tablesLoading && (
-                          <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                            Loading tables…
-                          </p>
-                        )}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '0.5rem' }}>
+
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(5, 1fr)',
+                          gap: '0.75rem',
+                          background: 'rgba(255,255,255,0.5)',
+                          padding: '1rem',
+                          borderRadius: '12px',
+                          border: '1px dashed #cbd5e1'
+                        }}>
                           {[1, 2, 3, 4, 5].map((t) => {
                             const isAvailable = tablesLoaded ? availableTables.includes(t) : false;
                             const isSelected = String(selectedTable) === String(t);
                             const isTaken = tablesLoaded ? takenTables.includes(t) : false;
+
                             return (
                               <button
                                 key={t}
                                 type="button"
-                                disabled={!tablesLoaded || !isAvailable}
+                                disabled={!tablesLoaded || (!isAvailable && !isSelected)}
                                 onClick={() => setSelectedTable(String(t))}
                                 style={{
-                                  padding: '0.75rem 0.5rem',
-                                  borderRadius: '10px',
-                                  border: isSelected ? '2px solid #0066cc' : '2px solid #e5e7eb',
-                                  background: !tablesLoaded ? '#f3f4f6' : !isAvailable ? '#f3f4f6' : isSelected ? 'rgba(0,102,204,0.12)' : '#ffffff',
-                                  color: !tablesLoaded ? '#9ca3af' : !isAvailable ? '#9ca3af' : '#0f172a',
-                                  cursor: (!tablesLoaded || !isAvailable) ? 'not-allowed' : 'pointer',
-                                  fontWeight: 700
+                                  aspectRatio: '1',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.25rem',
+                                  borderRadius: '12px',
+                                  border: isSelected ? '2px solid #0066cc' : '1px solid #e2e8f0',
+                                  background: !tablesLoaded ? '#f8fafc' : isTaken ? '#fee2e2' : isSelected ? 'rgba(0,102,204,0.1)' : '#ffffff',
+                                  color: isTaken ? '#ef4444' : isSelected ? '#0066cc' : '#475569',
+                                  cursor: (!tablesLoaded || (isTaken && !isSelected)) ? 'not-allowed' : 'pointer',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  boxShadow: isSelected ? '0 4px 12px rgba(0,102,204,0.15)' : 'none',
+                                  transform: isSelected ? 'scale(1.05)' : 'none',
+                                  opacity: (isTaken && !isSelected) ? 0.7 : 1
                                 }}
-                                title={!tablesLoaded ? 'Loading' : !isAvailable ? 'Booked' : `Table ${t}`}
                               >
-                                T{t}
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: !isAvailable ? '#9ca3af' : isSelected ? '#0066cc' : '#64748b' }}>
-                                  {!tablesLoaded ? 'Loading' : isTaken ? 'Booked' : isSelected ? 'Selected' : 'Available'}
-                                </div>
+                                <span style={{ fontSize: '1rem', fontWeight: 800 }}>T{t}</span>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                                  {!tablesLoaded ? '...' : isTaken ? 'Booked' : isSelected ? 'Selected' : 'Free'}
+                                </span>
                               </button>
                             );
                           })}
                         </div>
-                        {tablesLoaded && availableTables.length === 0 && nextAvailableTime && (
-                          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#b45309', fontWeight: 600 }}>
-                            All tables are booked for this slot. Next available at {nextAvailableTime.label}.
+
+                        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                            {tablesLoading ? 'Updating real-time status...' : selectedTable ? `You have selected Table ${selectedTable}` : 'Please tap a free table to reserve it'}
                           </p>
-                        )}
+                        </div>
                       </div>
                     )}
                     {reservationLoading && <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>Loading available slots…</p>}
-                    {!reservationLoading && availableSlots.length === 0 && nextAvailableTime && (
-                      <p style={{ margin: 0, fontSize: '0.875rem', color: '#b45309', fontWeight: '600' }}>
-                        Tables will be available after {nextAvailableTime.label} due to over rush. Please choose another time.
+                    {!reservationLoading && (availableSlots.length === 0 || availableSlots.every(s => s.isFull)) && nextAvailableTime && (
+                      <p style={{ margin: '1rem 0 0 0', fontSize: '0.875rem', color: '#b45309', fontWeight: '600', background: '#fffbeb', padding: '0.75rem', borderRadius: '8px', border: '1px solid #fef3c7' }}>
+                        <FiClock style={{ marginRight: '0.5rem' }} />
+                        Tables will be available after <strong>{nextAvailableTime.label}</strong> {nextAvailableTime.isToday ? 'today' : ''} due to over rush.
                       </p>
                     )}
                     {!reservationLoading && availableSlots.length === 0 && !nextAvailableTime && (
-                      <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>No slots available for today.</p>
+                      <p style={{ margin: '1rem 0 0 0', fontSize: '0.875rem', color: '#6b7280', textAlign: 'center', background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
+                        All reservation slots for today are closed. Please try another day or check back tomorrow.
+                      </p>
                     )}
                   </div>
                 )}
@@ -1016,7 +1176,7 @@ const Checkout = () => {
                         }}
                       >
                         <Image
-                          productId={item.id || item._id}
+                          src={constructImageUrl(item.image)}
                           alt={item.name}
                           style={{
                             width: '100%',

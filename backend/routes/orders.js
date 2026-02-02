@@ -63,7 +63,7 @@ router.get('/all', protect, async (req, res) => {
     }
 
     const orders = await Order.find(filter)
-      
+
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -330,7 +330,7 @@ router.post('/', protect, [
           success: false,
           message: 'Shipping address (address, city, postal code, country) is required for delivery'
         });
-        }
+      }
     } else {
       shippingAddress = shippingAddress || {
         address: deliveryType === 'ReserveTable' ? 'Table Reservation' : 'Food Court Pickup',
@@ -428,35 +428,47 @@ router.post('/', protect, [
       }
     }
 
-    console.log('Creating order in database...');
-    
-    // 🔥 CRITICAL FIX: Include totalAmount and paymentMethod in order creation
+    // Create the order
     const order = await Order.create({
       user: req.user._id,
-      products: orderProducts,
-      
-      // 🔥 REQUIRED: totalAmount from frontend (or calculated total as fallback)
+      items: products.map(p => ({
+        foodId: p.product,
+        foodName: p.name,
+        price: p.price,
+        quantity: p.quantity
+      })),
       totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
-      total: req.body.totalAmount ? Number(req.body.totalAmount) : total, // For backward compatibility
-      
-      // 🔥 REQUIRED: paymentMethod from frontend
       paymentMethod: req.body.paymentMethod || 'CASH',
-      
-      // 🔥 REQUIRED: paymentStatus based on payment method
       paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
-      
-      // 🔥 ETA: Dynamic estimated wait time
-      estimatedWait, // Smart calculation based on quantity + peak hours
-      
-      // 🍽️ ALTERNATE FOOD: Intelligent recommendation
+      estimatedWait,
       alternateFood: alternateFood
         ? { name: alternateFood.name, id: alternateFood._id }
         : null,
-      
+      deliveryType,
+      deliveryDetails: {
+        ...deliveryDetails,
+        ...(deliveryType === 'ReserveTable' && {
+          reservationSlot: req.body.reservationSlot || deliveryDetails.reservationSlot,
+          reservationTableNumber: Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber)
+        })
+      },
       shippingAddress,
-      
-      status: 'pending' // Set default status
+      orderStatus: 'Preparing'
     });
+
+    // If it's a table reservation, create the TableReservation record
+    if (deliveryType === 'ReserveTable') {
+      const slotStart = req.body.reservationSlot || deliveryDetails.reservationSlot;
+      const tableNumber = Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber);
+
+      await reservationController.createReservationForOrder(
+        req.user._id,
+        order._id,
+        slotStart,
+        tableNumber
+      );
+      console.log(`✅ Table reservation created for Table ${tableNumber} at ${slotStart}`);
+    }
 
     console.log('Order created, ID:', order._id);
     console.log('Order totalAmount:', order.totalAmount);
@@ -464,7 +476,7 @@ router.post('/', protect, [
     console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
     console.log('Order alternateFood:', order.alternateFood);
     console.log('Populating order details...');
-    
+
     await order.populate('user', 'name email');
 
     const orderItems = order.items || [];
