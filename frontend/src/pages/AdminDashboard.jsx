@@ -19,6 +19,7 @@ import { api } from '../utils/api';
 import { formatPrice, formatDate, getStatusColor } from "../utils/helpers";
 import { constructImageUrl } from '../utils/imageUtils';
 import { getDemandScore, getDemandLabel, getPrepRecommendation } from '../utils/demandPrediction';
+import { downloadDatabaseBackup } from '../services/backupService';
 import '../styles/admin.css';
 
 ChartJS.register(
@@ -101,6 +102,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [chartType, setChartType] = useState('line');
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [backupLoading, setBackupLoading] = useState(false);
 
   useEffect(() => {
     loadAnalytics();
@@ -153,6 +155,19 @@ const AdminDashboard = () => {
 
       XLSX.writeFile(workbook, `kec-foodcourt-report-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (err) { alert('Export failed'); }
+  };
+
+  const handleDatabaseBackup = async () => {
+    try {
+      setBackupLoading(true);
+      await downloadDatabaseBackup();
+      alert('✅ Backup downloaded successfully!');
+    } catch (error) {
+      console.error('Backup error:', error);
+      alert('❌ Backup failed: ' + error.message);
+    } finally {
+      setBackupLoading(false);
+    }
   };
 
   if (loading) return (
@@ -228,6 +243,15 @@ const AdminDashboard = () => {
           <p style={{ color: '#64748b', marginTop: '0.5rem' }}>Live campus dining analytics as of {lastUpdated.toLocaleTimeString()}</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
+          <button 
+            onClick={handleDatabaseBackup} 
+            disabled={backupLoading}
+            className="admin-btn-primary" 
+            style={{ background: '#3b82f6' }}
+            title="Backup all database collections as ZIP file"
+          >
+            <FiDownload /> <span>{backupLoading ? 'Backing up...' : 'Backup'}</span>
+          </button>
           <button onClick={downloadExcelReport} className="admin-btn-primary" style={{ background: '#10b981' }}>
             <FiDownload /> <span>Export Stats</span>
           </button>
