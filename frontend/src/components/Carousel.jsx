@@ -57,7 +57,7 @@ const PrevArrow = ({ onClick }) => (
       transform: 'translateY(-50%)',
       zIndex: 20,
       background: 'rgba(255, 255, 255, 0.95)',
-      color: '#1e40af',
+      color: '#969eb8ff',
       border: 'none',
       borderRadius: '50%',
       width: '56px',
@@ -288,7 +288,7 @@ const Carousel = ({ slides = [] }) => {
                 }}
               >
                 {/* Background Image with Ken Burns Effect */}
-                <div 
+                <div
                   className="slide-image"
                   style={{
                     position: 'absolute',
@@ -307,7 +307,7 @@ const Carousel = ({ slides = [] }) => {
                 <div className="container mx-auto px-4 md:px-8 h-full flex items-center relative" style={{ zIndex: 3 }}>
                   <div className="max-w-3xl text-white slide-content-animate">
                     {/* Badge */}
-                    <div 
+                    <div
                       className="badge-pulse"
                       style={{
                         display: 'inline-flex',
@@ -331,7 +331,7 @@ const Carousel = ({ slides = [] }) => {
                     </div>
 
                     {/* Title */}
-                    <h2 
+                    <h2
                       className="content-glow"
                       style={{
                         fontSize: 'clamp(2.5rem, 5vw, 4.5rem)',
@@ -345,7 +345,7 @@ const Carousel = ({ slides = [] }) => {
                     </h2>
 
                     {/* Subtitle */}
-                    <p 
+                    <p
                       className="content-glow"
                       style={{
                         fontSize: 'clamp(1.125rem, 2vw, 1.5rem)',
@@ -383,9 +383,9 @@ const Carousel = ({ slides = [] }) => {
                     </div>
 
                     {/* Trust Indicators */}
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '2rem', 
+                    <div style={{
+                      display: 'flex',
+                      gap: '2rem',
                       marginTop: '2.5rem',
                       flexWrap: 'wrap',
                       alignItems: 'center'

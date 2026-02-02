@@ -45,16 +45,16 @@ const OrderManagement = () => {
     if (window.confirm(`Update order status to "${newStatus}"?`)) {
       try {
         setError(null);
-        
+
         // Optimistic UI update - immediately update the local state
-        setOrders(prevOrders => 
-          prevOrders.map(order => 
-            order._id === orderId 
+        setOrders(prevOrders =>
+          prevOrders.map(order =>
+            order._id === orderId
               ? { ...order, orderStatus: newStatus }
               : order
           )
         );
-        
+
         // Update stats optimistically
         const updatedStats = { ...stats };
         const orderToUpdate = orders.find(o => o._id === orderId);
@@ -64,17 +64,17 @@ const OrderManagement = () => {
           if (updatedStats.hasOwnProperty(oldStatusKey)) {
             updatedStats[oldStatusKey]--;
           }
-          
+
           // Increase count of new status
           const newStatusKey = newStatus.toLowerCase();
           if (updatedStats.hasOwnProperty(newStatusKey)) {
             updatedStats[newStatusKey]++;
           }
         }
-        
+
         // Make API call
         await api.updateOrderStatus(orderId, { orderStatus: newStatus });
-        
+
         // Refresh data to ensure consistency
         await loadOrders(true);
       } catch (error) {
@@ -100,7 +100,7 @@ const OrderManagement = () => {
     outForDelivery: orders.filter(o => o.orderStatus === 'OutForDelivery').length,
     delivered: orders.filter(o => o.orderStatus === 'Delivered').length,
     cancelled: orders.filter(o => o.orderStatus === 'Cancelled').length,
-    totalRevenue: orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0),
+    totalRevenue: orders.reduce((sum, order) => sum + (order.totalAmount || order.total || 0), 0),
     totalOrders: orders.length
   };
 
@@ -194,7 +194,7 @@ const OrderManagement = () => {
                         {order.deliveryType}
                       </span>
                     </td>
-                    <td style={{ fontWeight: '600' }}>{formatPrice(order.totalAmount || 0)}</td>
+                    <td style={{ fontWeight: '600' }}>{formatPrice(order.totalAmount || order.total || 0)}</td>
                     <td>
                       <span className={`admin-badge badge-${(order.orderStatus || 'Preparing').toLowerCase()}`}>
                         {order.orderStatus}
@@ -306,7 +306,7 @@ const OrderManagement = () => {
               }}>
                 <span style={{ fontSize: '1.2rem', fontWeight: '600' }}>Bill Amount:</span>
                 <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0066cc' }}>
-                  {formatPrice(selectedOrder.totalAmount || 0)}
+                  {formatPrice(selectedOrder.totalAmount || selectedOrder.total || 0)}
                 </span>
               </div>
             </div>

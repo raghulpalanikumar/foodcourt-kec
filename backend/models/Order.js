@@ -61,7 +61,7 @@ const orderSchema = new mongoose.Schema({
 
   deliveryType: {
     type: String,
-    enum: ['FoodCourt', 'Classroom'],
+    enum: ['Pickup', 'Delivery', 'ReserveTable', 'FoodCourt', 'Classroom'],
     default: 'FoodCourt'
   },
 
@@ -69,7 +69,9 @@ const orderSchema = new mongoose.Schema({
     tableNumber: String,
     classroomInfo: String,
     department: String,
-    block: String
+    block: String,
+    reservationSlot: Date,
+    reservationTableNumber: Number
   },
 
   paymentMethod: {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiMinus, FiPlus, FiTrash2, FiShoppingBag, FiClock, FiMapPin, FiPhone, FiTruck, FiGift, FiTag, FiChevronRight, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { FiMinus, FiPlus, FiTrash2, FiShoppingBag, FiClock, FiMapPin, FiPhone, FiTruck, FiGift, FiTag, FiChevronRight, FiAlertCircle, FiCheckCircle, FiPackage } from 'react-icons/fi';
 import { useCart } from '../context/cartContext';
 import { useAuth } from '../context/authContext';
 import { formatPrice } from '../utils/helpers';
@@ -67,8 +67,9 @@ const Cart = () => {
   const tax = (subtotal - promoDiscount) * 0.08;
   const total = subtotal - promoDiscount + deliveryFee + tax;
 
-  // Delivery time estimation
-  const estimatedTime = selectedDeliveryOption === 'pickup' ? '15-20 mins' : '30-45 mins';
+  const estimatedTime = selectedDeliveryOption === 'pickup' ? '15-20 mins' : selectedDeliveryOption === 'reserve' ? 'At your selected time (30 mins)' : '30-45 mins';
+  const deliveryOptionLabel = selectedDeliveryOption === 'pickup' ? 'Pickup' : selectedDeliveryOption === 'reserve' ? 'Reserve table' : 'Delivery';
+  const deliveryOptionSub = selectedDeliveryOption === 'pickup' ? 'FREE • 15-20 mins' : selectedDeliveryOption === 'reserve' ? 'FREE • At your selected time (30 mins)' : `$${deliveryFee} • 30-45 mins`;
 
   if (cartItems.length === 0) {
     return (
@@ -338,17 +339,16 @@ const Cart = () => {
                 <FiTruck size={22} />
                 Choose Delivery Option
               </h3>
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setSelectedDeliveryOption('pickup')}
                   style={{
-                    flex: 1,
+                    flex: '1 1 120px',
+                    minWidth: '120px',
                     padding: '1.25rem',
                     borderRadius: '14px',
                     border: selectedDeliveryOption === 'pickup' ? '2px solid #667eea' : '2px solid #e2e8f0',
-                    background: selectedDeliveryOption === 'pickup' 
-                      ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
-                      : 'white',
+                    background: selectedDeliveryOption === 'pickup' ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'white',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
                     display: 'flex',
@@ -370,26 +370,19 @@ const Cart = () => {
                   }}
                 >
                   <FiMapPin size={28} color={selectedDeliveryOption === 'pickup' ? '#667eea' : '#718096'} />
-                  <div style={{
-                    fontWeight: '700',
-                    fontSize: '1.1rem',
-                    color: selectedDeliveryOption === 'pickup' ? '#667eea' : '#2d3748'
-                  }}>
-                    Pickup
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#718096' }}>FREE • {estimatedTime}</div>
+                  <div style={{ fontWeight: '700', fontSize: '1.1rem', color: selectedDeliveryOption === 'pickup' ? '#667eea' : '#2d3748' }}>Pickup</div>
+                  <div style={{ fontSize: '0.875rem', color: '#718096' }}>FREE • 15-20 mins</div>
                 </button>
 
                 <button
                   onClick={() => setSelectedDeliveryOption('delivery')}
                   style={{
-                    flex: 1,
+                    flex: '1 1 120px',
+                    minWidth: '120px',
                     padding: '1.25rem',
                     borderRadius: '14px',
                     border: selectedDeliveryOption === 'delivery' ? '2px solid #667eea' : '2px solid #e2e8f0',
-                    background: selectedDeliveryOption === 'delivery'
-                      ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
-                      : 'white',
+                    background: selectedDeliveryOption === 'delivery' ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'white',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
                     display: 'flex',
@@ -411,14 +404,42 @@ const Cart = () => {
                   }}
                 >
                   <FiTruck size={28} color={selectedDeliveryOption === 'delivery' ? '#667eea' : '#718096'} />
-                  <div style={{
-                    fontWeight: '700',
-                    fontSize: '1.1rem',
-                    color: selectedDeliveryOption === 'delivery' ? '#667eea' : '#2d3748'
-                  }}>
-                    Delivery
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#718096' }}>${deliveryFee} • {estimatedTime}</div>
+                  <div style={{ fontWeight: '700', fontSize: '1.1rem', color: selectedDeliveryOption === 'delivery' ? '#667eea' : '#2d3748' }}>Delivery</div>
+                  <div style={{ fontSize: '0.875rem', color: '#718096' }}>$0 • 15-20 mins</div>
+                </button>
+
+                <button
+                  onClick={() => setSelectedDeliveryOption('reserve')}
+                  style={{
+                    flex: '1 1 120px',
+                    minWidth: '120px',
+                    padding: '1.25rem',
+                    borderRadius: '14px',
+                    border: selectedDeliveryOption === 'reserve' ? '2px solid #667eea' : '2px solid #e2e8f0',
+                    background: selectedDeliveryOption === 'reserve' ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedDeliveryOption !== 'reserve') {
+                      e.currentTarget.style.borderColor = '#cbd5e0';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedDeliveryOption !== 'reserve') {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }
+                  }}
+                >
+                  <FiPackage size={28} color={selectedDeliveryOption === 'reserve' ? '#667eea' : '#718096'} />
+                  <div style={{ fontWeight: '700', fontSize: '1.1rem', color: selectedDeliveryOption === 'reserve' ? '#667eea' : '#2d3748' }}>Reserve table</div>
+                  <div style={{ fontSize: '0.875rem', color: '#718096' }}>FREE • At your selected time (30 mins)</div>
                 </button>
               </div>
             </div>
@@ -869,21 +890,14 @@ const Cart = () => {
                     }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <FiTruck size={18} />
-                        {selectedDeliveryOption === 'pickup' ? 'Pickup' : 'Delivery'}:
+                        {deliveryOptionLabel}:
                       </span>
                       <div style={{ textAlign: 'right' }}>
                         <span style={{ fontWeight: '600' }}>
                           {deliveryFee === 0 ? 'FREE' : formatPrice(deliveryFee)}
                         </span>
-                        {deliveryFee === 0 && (
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#48bb78',
-                            fontWeight: '700',
-                            marginTop: '0.25rem'
-                          }}>
-                            Save ${5.99}!
-                          </div>
+                        {deliveryFee === 0 && selectedDeliveryOption !== 'reserve' && (
+                          <div style={{ fontSize: '0.75rem', color: '#48bb78', fontWeight: '700', marginTop: '0.25rem' }}>Save ${5.99}!</div>
                         )}
                       </div>
                     </div>

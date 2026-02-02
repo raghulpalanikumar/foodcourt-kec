@@ -1,0 +1,12 @@
+Starting final seed...
+Connecting to mongodb://localhost:27017/kec_foodcourt
+Synced Masala Dosa to mongodb://localhost:27017/kec_foodcourt
+Synced South Indian Thali to mongodb://localhost:27017/kec_foodcourt
+Synced Hyderabadi Chicken Biryani to mongodb://localhost:27017/kec_foodcourt
+Synced Paneer Dum Biryani to mongodb://localhost:27017/kec_foodcourt
+Connecting to mongodb://localhost:27017/ecommerce
+Synced Masala Dosa to mongodb://localhost:27017/ecommerce
+Synced South Indian Thali to mongodb://localhost:27017/ecommerce
+Synced Hyderabadi Chicken Biryani to mongodb://localhost:27017/ecommerce
+Synced Paneer Dum Biryani to mongodb://localhost:27017/ecommerce
+All seeds finished
