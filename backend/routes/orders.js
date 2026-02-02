@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { protect } = require('../middlewares/auth');
+const reservationController = require('../controllers/reservationController');
 
 const router = express.Router();
 
@@ -14,24 +15,25 @@ router.get('/', protect, async (req, res) => {
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
-    // Transform orders to match frontend expectations
-    const transformedOrders = orders.map(order => ({
+    const toProducts = (items) => (items || []).map((i) => (i.foodId != null ? { product: i.foodId, name: i.foodName, price: i.price, quantity: i.quantity } : i));
+    const rawItems = (order) => order.items || order.products || [];
+
+    const transformedOrders = orders.map((order) => ({
       _id: order._id,
-      id: order._id, // Add both _id and id for compatibility
+      id: order._id,
       userName: order.user?.name || req.user.name,
       userEmail: order.user?.email || req.user.email,
-      user: {
-        name: order.user?.name || req.user.name,
-        email: order.user?.email || req.user.email
-      },
+      user: { name: order.user?.name || req.user.name, email: order.user?.email || req.user.email },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: order.products, // Map products to items
-      products: order.products, // Keep both for compatibility
-      total: order.total,
-      status: order.status || 'pending',
-      estimatedWait: order.estimatedWait, // ETA
-      alternateFood: order.alternateFood, // Recommended alternative
+      items: rawItems(order),
+      products: toProducts(rawItems(order)),
+      total: order.totalAmount ?? order.total,
+      status: order.orderStatus ?? order.status ?? 'pending',
+      deliveryType: order.deliveryType,
+      deliveryDetails: order.deliveryDetails,
+      estimatedWait: order.estimatedWait,
+      alternateFood: order.alternateFood,
       shippingAddress: order.shippingAddress
     }));
 
@@ -57,35 +59,34 @@ router.get('/all', protect, async (req, res) => {
   try {
     const { status } = req.query;
 
-    // Build filter object
     const filter = {};
     if (status && status !== 'all') {
-      filter.status = status;
+      filter.$or = [{ orderStatus: status }, { status }];
     }
 
     const orders = await Order.find(filter)
-      
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
-    // Transform orders to match frontend expectations
-    const transformedOrders = orders.map(order => ({
+    const toProducts = (items) => (items || []).map((i) => (i.foodId != null ? { product: i.foodId, name: i.foodName, price: i.price, quantity: i.quantity } : i));
+    const rawItems = (order) => order.items || order.products || [];
+
+    const transformedOrders = orders.map((order) => ({
       _id: order._id,
       id: order._id,
       userName: order.user?.name || 'Unknown User',
       userEmail: order.user?.email || 'No email',
-      user: {
-        name: order.user?.name || 'Unknown User',
-        email: order.user?.email || 'No email'
-      },
+      user: { name: order.user?.name || 'Unknown User', email: order.user?.email || 'No email' },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: order.products,
-      products: order.products,
-      total: order.total,
-      status: order.status || 'pending',
-      estimatedWait: order.estimatedWait, // ETA
-      alternateFood: order.alternateFood, // Recommended alternative
+      items: rawItems(order),
+      products: toProducts(rawItems(order)),
+      total: order.totalAmount ?? order.total,
+      status: order.orderStatus ?? order.status ?? 'pending',
+      deliveryType: order.deliveryType,
+      deliveryDetails: order.deliveryDetails,
+      estimatedWait: order.estimatedWait,
+      alternateFood: order.alternateFood,
       shippingAddress: order.shippingAddress
     }));
 
@@ -126,29 +127,30 @@ router.put('/:id/status', protect, [
       });
     }
 
-    const oldStatus = order.status;
+    const currentStatus = order.orderStatus ?? order.status;
 
-    // If cancelling an order, restore product stock
-    if (status === 'cancelled' && order.status !== 'cancelled') {
+    const itemsForStock = order.items || order.products || [];
+    if (status === 'cancelled' && currentStatus !== 'Cancelled' && currentStatus !== 'cancelled') {
       try {
-        for (let item of order.products) {
-          const product = await Product.findById(item.product);
+        for (const item of itemsForStock) {
+          const productId = item.foodId ?? item.product;
+          const qty = item.quantity || 0;
+          const product = await Product.findById(productId);
           if (product) {
-            product.stock += item.quantity;
+            product.stock += qty;
             await product.save();
           }
         }
       } catch (stockError) {
         console.error('Error restoring stock:', stockError);
-        // Continue anyway - don't fail the status update
       }
     }
 
-    order.status = status;
+    const statusMap = { cancelled: 'Cancelled', delivered: 'Delivered', shipped: 'OutForDelivery', processing: 'Preparing', pending: 'Preparing' };
+    order.orderStatus = statusMap[status] || order.orderStatus || status;
     order.updatedAt = new Date();
     await order.save();
 
-    // Send email notification for status updates (except for pending status)
     if (status !== 'pending' && order.user && order.user.email) {
       try {
         const { sendOrderStatusUpdateEmail } = require('../utils/emailService');
@@ -157,7 +159,7 @@ router.put('/:id/status', protect, [
           order.user.name,
           {
             orderId: order._id.toString().slice(-8),
-            total: order.total,
+            total: order.totalAmount ?? order.total,
             shippingAddress: order.shippingAddress
           },
           status
@@ -211,24 +213,24 @@ router.get('/:id', protect, async (req, res) => {
     }
     */
 
-    // Transform order to match frontend expectations
+    const rawItems = order.items || order.products || [];
+    const toProducts = (items) => (items || []).map((i) => (i.foodId != null ? { product: i.foodId, name: i.foodName, price: i.price, quantity: i.quantity } : i));
     const transformedOrder = {
       _id: order._id,
       id: order._id,
       userName: order.user?.name || 'Unknown User',
       userEmail: order.user?.email || 'No email',
-      user: {
-        name: order.user?.name || 'Unknown User',
-        email: order.user?.email || 'No email'
-      },
+      user: { name: order.user?.name || 'Unknown User', email: order.user?.email || 'No email' },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: order.products,
-      products: order.products,
-      total: order.total,
-      status: order.status || 'pending',
-      estimatedWait: order.estimatedWait, // ETA
-      alternateFood: order.alternateFood, // Recommended alternative
+      items: rawItems(order),
+      products: toProducts(rawItems(order)),
+      total: order.totalAmount ?? order.total,
+      status: order.orderStatus ?? order.status ?? 'pending',
+      deliveryType: order.deliveryType,
+      deliveryDetails: order.deliveryDetails,
+      estimatedWait: order.estimatedWait,
+      alternateFood: order.alternateFood,
       shippingAddress: order.shippingAddress
     };
 
@@ -253,29 +255,97 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', protect, [
   body('products').isArray({ min: 1 }).withMessage('Products array is required'),
   body('products.*.product').notEmpty().withMessage('Product ID is required'),
-  body('products.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
-  body('shippingAddress.address').trim().notEmpty().withMessage('Address is required'),
-  body('shippingAddress.city').trim().notEmpty().withMessage('City is required'),
-  body('shippingAddress.postalCode').trim().notEmpty().withMessage('Postal code is required'),
-  body('shippingAddress.country').trim().notEmpty().withMessage('Country is required')
+  body('products.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1')
 ], async (req, res) => {
   try {
-    // Debug: Log the request body
     console.log('Order creation request body:', req.body);
-    console.log('Products in request:', req.body.products);
-    console.log('Products type:', typeof req.body.products);
-    console.log('Products is array:', Array.isArray(req.body.products));
+
+    // Support both items (Razorpay/ReserveTable) and products (COD) formats
+    if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0 && !req.body.products) {
+      req.body.products = req.body.items.map((i) => ({
+        product: i.foodId || i.id || i.productId,
+        name: i.foodName || i.name,
+        price: i.price,
+        quantity: i.quantity || 1
+      }));
+    }
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: errors.array()[0].msg
       });
     }
 
-    const { products, shippingAddress } = req.body;
+    const deliveryType = req.body.deliveryType || 'FoodCourt';
+    const deliveryDetails = req.body.deliveryDetails || {};
+
+    // ReserveTable: require reservationSlot
+    if (deliveryType === 'ReserveTable') {
+      if (!req.body.reservationSlot && !deliveryDetails.reservationSlot) {
+        return res.status(400).json({
+          success: false,
+          message: 'Reservation slot is required for table reservation'
+        });
+      }
+      const tableNumberRaw = req.body.reservationTableNumber || deliveryDetails.reservationTableNumber;
+      const tableNumber = Number(tableNumberRaw);
+      if (!tableNumberRaw || Number.isNaN(tableNumber) || tableNumber < 1 || tableNumber > 5) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a valid table (1-5)'
+        });
+      }
+      const slotStart = new Date(req.body.reservationSlot || deliveryDetails.reservationSlot);
+      if (isNaN(slotStart.getTime()) || slotStart < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or past reservation time'
+        });
+      }
+      // Today-only enforcement
+      const today = new Date();
+      const slotDay = new Date(slotStart);
+      today.setHours(0, 0, 0, 0);
+      slotDay.setHours(0, 0, 0, 0);
+      if (slotDay.getTime() !== today.getTime()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Table reservations are available only for today'
+        });
+      }
+
+      const tableFree = await reservationController.isTableAvailableForSlot(tableNumber, slotStart);
+      if (!tableFree) {
+        const nextData = await reservationController.getNextAvailableSlot(slotStart.toISOString());
+        return res.status(400).json({
+          success: false,
+          message: `Table ${tableNumber} is not available at this time. Tables will be available after ${nextData.label} due to over rush.`,
+          nextAvailable: nextData
+        });
+      }
+    }
+
+    // Shipping address required only for Delivery / Classroom
+    let shippingAddress = req.body.shippingAddress;
+    if (deliveryType === 'Delivery' || deliveryType === 'Classroom') {
+      if (!shippingAddress?.address || !shippingAddress?.city || !shippingAddress?.postalCode || !shippingAddress?.country) {
+        return res.status(400).json({
+          success: false,
+          message: 'Shipping address (address, city, postal code, country) is required for delivery'
+        });
+        }
+    } else {
+      shippingAddress = shippingAddress || {
+        address: deliveryType === 'ReserveTable' ? 'Table Reservation' : 'Food Court Pickup',
+        city: 'Campus',
+        postalCode: '000000',
+        country: 'India'
+      };
+    }
+
+    const { products } = req.body;
 
     // Validate products and calculate total
     let total = 0;
@@ -364,46 +434,62 @@ router.post('/', protect, [
     }
 
     console.log('Creating order in database...');
-    
-    // 🔥 CRITICAL FIX: Include totalAmount and paymentMethod in order creation
-    const order = await Order.create({
+
+    const orderPayload = {
       user: req.user._id,
-      products: orderProducts,
-      
-      // 🔥 REQUIRED: totalAmount from frontend (or calculated total as fallback)
+      items: orderProducts.map((p) => ({
+        foodId: p.product,
+        foodName: p.name,
+        price: p.price,
+        quantity: p.quantity
+      })),
       totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
-      total: req.body.totalAmount ? Number(req.body.totalAmount) : total, // For backward compatibility
-      
-      // 🔥 REQUIRED: paymentMethod from frontend
-      paymentMethod: req.body.paymentMethod || 'CASH',
-      
-      // 🔥 REQUIRED: paymentStatus based on payment method
-      paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
-      
-      // 🔥 ETA: Dynamic estimated wait time
-      estimatedWait, // Smart calculation based on quantity + peak hours
-      
-      // 🍽️ ALTERNATE FOOD: Intelligent recommendation
+      // Payment rules: allow CASH (COD) or ONLINE for all options
+      paymentMethod: (req.body.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH'),
+      paymentStatus: (req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending'),
+      estimatedWait,
       alternateFood: alternateFood
         ? { name: alternateFood.name, id: alternateFood._id }
         : null,
-      
-      shippingAddress,
-      
-      status: 'pending' // Set default status
-    });
+      orderStatus: 'Preparing',
+      deliveryType: deliveryType === 'ReserveTable' ? 'ReserveTable' : deliveryType === 'Delivery' ? 'Delivery' : deliveryType === 'Pickup' ? 'Pickup' : deliveryType,
+      deliveryDetails: { ...deliveryDetails }
+    };
+
+    if (deliveryType === 'ReserveTable' && (req.body.reservationSlot || deliveryDetails.reservationSlot)) {
+      orderPayload.deliveryDetails.reservationSlot = new Date(req.body.reservationSlot || deliveryDetails.reservationSlot);
+      orderPayload.deliveryDetails.reservationTableNumber = Number(req.body.reservationTableNumber || deliveryDetails.reservationTableNumber);
+    }
+
+    const order = await Order.create(orderPayload);
+
+    // Create table reservation when deliveryType is ReserveTable
+    if (deliveryType === 'ReserveTable' && orderPayload.deliveryDetails.reservationSlot) {
+      const reservation = await reservationController.createReservationForOrder(
+        req.user._id,
+        order._id,
+        orderPayload.deliveryDetails.reservationSlot,
+        orderPayload.deliveryDetails.reservationTableNumber
+      );
+      if (reservation) {
+        order.deliveryDetails = order.deliveryDetails || {};
+        order.deliveryDetails.reservationTableNumber = reservation.tableNumber;
+        await order.save();
+      }
+    }
 
     console.log('Order created, ID:', order._id);
-    console.log('Order totalAmount:', order.totalAmount);
-    console.log('Order paymentMethod:', order.paymentMethod);
-    console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
-    console.log('Order alternateFood:', order.alternateFood);
-    console.log('Populating order details...');
-    
-    await order.populate('user', 'name email');
-    console.log('Order populated. User email:', order.user?.email);
 
-    // Transform order to match frontend expectations
+    await order.populate('user', 'name email');
+
+    const orderItems = order.items || [];
+    const productsFormat = orderItems.map((i) => ({
+      product: i.foodId,
+      name: i.foodName,
+      price: i.price,
+      quantity: i.quantity
+    }));
+
     const transformedOrder = {
       _id: order._id,
       id: order._id,
@@ -415,16 +501,19 @@ router.post('/', protect, [
       },
       date: order.createdAt,
       createdAt: order.createdAt,
-      items: order.products,
-      products: order.products,
-      total: order.total || order.totalAmount,
+      items: orderItems,
+      products: productsFormat,
+      total: order.totalAmount,
       totalAmount: order.totalAmount,
-      status: order.status,
+      status: order.orderStatus || 'pending',
+      orderStatus: order.orderStatus,
+      deliveryType: order.deliveryType,
+      deliveryDetails: order.deliveryDetails,
       paymentMethod: order.paymentMethod,
       paymentStatus: order.paymentStatus,
-      estimatedWait: order.estimatedWait, // 🔥 ETA for frontend
-      alternateFood: order.alternateFood, // 🍽️ Recommended alternative
-      shippingAddress: order.shippingAddress
+      estimatedWait: order.estimatedWait,
+      alternateFood: order.alternateFood,
+      shippingAddress: order.deliveryDetails?.address ? { address: order.deliveryDetails.address, city: order.deliveryDetails.city, postalCode: order.deliveryDetails.postalCode, country: order.deliveryDetails.country } : { address: 'Food Court', city: 'Campus', postalCode: '000000', country: 'India' }
     };
 
     console.log('Sending response to frontend...');
