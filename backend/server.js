@@ -55,6 +55,7 @@ const reviewRoutes = require('./routes/reviews');
 const paymentRoutes = require('./routes/payment.routes');
 const queueRoutes = require('./routes/queueRoutes');
 const reservationRoutes = require('./routes/reservations');
+const backupRoutes = require('./routes/backup');
 const errorHandler = require('./middlewares/error');
 
 /* -------------------------------------------------- */
@@ -71,6 +72,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/reservations', reservationRoutes);
+app.use('/api/backup', backupRoutes);
 
 // Static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
