@@ -63,10 +63,6 @@ router.get('/all', protect, async (req, res) => {
     }
 
     const orders = await Order.find(filter)
-<<<<<<<<< Temporary merge branch 1
-=========
-
->>>>>>>>> Temporary merge branch 2
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -433,7 +429,6 @@ router.post('/', protect, [
 
     console.log('Creating order in database...');
 
-<<<<<<<<< Temporary merge branch 1
     const orderPayload = {
       user: req.user._id,
       items: orderProducts.map((p) => ({
@@ -478,45 +473,6 @@ router.post('/', protect, [
     }
 
     console.log('Order created, ID:', order._id);
-=========
-    // 🔥 CRITICAL FIX: Include totalAmount and paymentMethod in order creation
-    const order = await Order.create({
-      user: req.user._id,
-      products: orderProducts,
-
-      // 🔥 REQUIRED: totalAmount from frontend (or calculated total as fallback)
-      totalAmount: req.body.totalAmount ? Number(req.body.totalAmount) : total,
-      total: req.body.totalAmount ? Number(req.body.totalAmount) : total, // For backward compatibility
-
-      // 🔥 REQUIRED: paymentMethod from frontend
-      paymentMethod: req.body.paymentMethod || 'CASH',
-
-      // 🔥 REQUIRED: paymentStatus based on payment method
-      paymentStatus: req.body.paymentMethod === 'ONLINE' ? 'Paid' : 'Pending',
-
-      // 🔥 ETA: Dynamic estimated wait time
-      estimatedWait, // Smart calculation based on quantity + peak hours
-
-      // 🍽️ ALTERNATE FOOD: Intelligent recommendation
-      alternateFood: alternateFood
-        ? { name: alternateFood.name, id: alternateFood._id }
-        : null,
-
-      shippingAddress,
-
-      status: 'pending' // Set default status
-    });
-
-    console.log('Order created, ID:', order._id);
-    console.log('Order totalAmount:', order.totalAmount);
-    console.log('Order paymentMethod:', order.paymentMethod);
-    console.log('Order estimatedWait:', order.estimatedWait, 'minutes');
-    console.log('Order alternateFood:', order.alternateFood);
-    console.log('Populating order details...');
-
-    await order.populate('user', 'name email');
-    console.log('Order populated. User email:', order.user?.email);
->>>>>>>>> Temporary merge branch 2
 
     await order.populate('user', 'name email');
 
